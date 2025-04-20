@@ -6,13 +6,17 @@ interface TimelineProps {
   pixelsPerBeat: number;
   beatsPerBar: number;
   totalBars: number;
+  currentTime: string;
+  totalTime: string;
 }
 
 const Timeline: React.FC<TimelineProps> = ({
   width,
   pixelsPerBeat,
   beatsPerBar,
-  totalBars
+  totalBars,
+  currentTime,
+  totalTime
 }) => {
   const totalBeats = totalBars * beatsPerBar;
   const markers = [];
@@ -22,7 +26,6 @@ const Timeline: React.FC<TimelineProps> = ({
     const isMajor = beat % beatsPerBar === 0;
     const position = beat * pixelsPerBeat;
     
-    // Don't render markers that are outside the visible area
     if (position > width) break;
     
     markers.push(
@@ -32,7 +35,7 @@ const Timeline: React.FC<TimelineProps> = ({
         style={{ left: `${position}px` }}
       >
         {isMajor && (
-          <div className="absolute top-full text-xs text-muted-foreground font-mono mt-0.5">
+          <div className="absolute top-full text-xs font-mono text-muted-foreground mt-0.5">
             {Math.floor(beat / beatsPerBar) + 1}
           </div>
         )}
@@ -41,8 +44,14 @@ const Timeline: React.FC<TimelineProps> = ({
   }
   
   return (
-    <div className="relative h-8 border-b border-border bg-secondary overflow-hidden">
-      <div className="h-full relative">
+    <div className="relative h-16 border-b border-border bg-secondary/50">
+      <div className="absolute top-0 left-4 flex items-center h-full">
+        <div className="font-mono text-2xl text-white">
+          {currentTime}
+          <span className="text-sm text-muted-foreground ml-2">/ {totalTime}</span>
+        </div>
+      </div>
+      <div className="h-full relative mt-8">
         {markers}
       </div>
     </div>

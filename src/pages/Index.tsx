@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import Toolbar from '@/components/Toolbar';
 import TrackList, { TrackInfo } from '@/components/TrackList';
@@ -8,7 +7,6 @@ import EditDrawer from '@/components/EditDrawer';
 import RemoteUser from '@/components/RemoteUser';
 import { toast } from "@/hooks/use-toast";
 
-// Define types for our data
 interface Block {
   id: string;
   name: string;
@@ -27,7 +25,6 @@ interface RemoteUserInfo {
   color: string;
 }
 
-// Sample users for demo
 const remoteUsers: RemoteUserInfo[] = [
   {
     id: 'user1',
@@ -44,7 +41,6 @@ const remoteUsers: RemoteUserInfo[] = [
 ];
 
 const Index = () => {
-  // App state
   const [isPlaying, setIsPlaying] = useState(false);
   const [bpm, setBpm] = useState(120);
   const [masterVolume, setMasterVolume] = useState(80);
@@ -57,11 +53,9 @@ const Index = () => {
   const [totalBars] = useState(16);
   const [showCollaborators] = useState(true);
   
-  // Container refs for measuring
   const tracksContainerRef = useRef<HTMLDivElement>(null);
   const [containerWidth, setContainerWidth] = useState(0);
   
-  // Resize observer for responsive layout
   useEffect(() => {
     if (!tracksContainerRef.current) return;
     
@@ -71,10 +65,8 @@ const Index = () => {
       }
     };
     
-    // Initial measurement
     updateWidth();
     
-    // Set up resize observer
     const resizeObserver = new ResizeObserver(updateWidth);
     resizeObserver.observe(tracksContainerRef.current);
     
@@ -85,7 +77,6 @@ const Index = () => {
     };
   }, []);
   
-  // Sample data for tracks
   const [tracks, setTracks] = useState<TrackInfo[]>([
     { id: 'track1', name: 'Drums', color: '#FF466A', volume: 80, muted: false, solo: false },
     { id: 'track2', name: 'Bass', color: '#FFB446', volume: 75, muted: false, solo: false },
@@ -93,7 +84,6 @@ const Index = () => {
     { id: 'track4', name: 'Vocals', color: '#5096FF', volume: 85, muted: false, solo: false },
   ]);
   
-  // Sample data for blocks
   const [blocks, setBlocks] = useState<Block[]>([
     { id: 'block1', name: 'Kick', track: 0, startBeat: 0, lengthBeats: 4, volume: 80, pitch: 0 },
     { id: 'block2', name: 'Snare', track: 0, startBeat: 8, lengthBeats: 4, volume: 75, pitch: 0 },
@@ -102,16 +92,13 @@ const Index = () => {
     { id: 'block5', name: 'Vocal Chop', track: 3, startBeat: 16, lengthBeats: 8, volume: 85, pitch: 2 },
   ]);
   
-  // Handle block selection
   const handleSelectBlock = (id: string) => {
     setSelectedBlockId(id);
     setIsDrawerOpen(true);
   };
   
-  // Find the selected block
   const selectedBlock = blocks.find(block => block.id === selectedBlockId);
   
-  // Handle block position change (drag)
   const handleBlockPositionChange = (id: string, newTrack: number, newStartBeat: number) => {
     setBlocks(prevBlocks => 
       prevBlocks.map(block => 
@@ -122,7 +109,6 @@ const Index = () => {
     );
   };
   
-  // Handle block length change (resize)
   const handleBlockLengthChange = (id: string, newLength: number) => {
     setBlocks(prevBlocks => 
       prevBlocks.map(block => 
@@ -133,7 +119,6 @@ const Index = () => {
     );
   };
   
-  // Handle playback
   const handlePlay = () => {
     setIsPlaying(true);
     toast({
@@ -153,7 +138,6 @@ const Index = () => {
     }
   };
   
-  // Handle track list actions
   const handleTrackVolumeChange = (trackId: string, volume: number) => {
     setTracks(prevTracks => 
       prevTracks.map(track => 
@@ -207,7 +191,6 @@ const Index = () => {
     });
   };
   
-  // Handle drawer actions
   const handleBlockNameChange = (id: string, name: string) => {
     setBlocks(prevBlocks => 
       prevBlocks.map(block => 
@@ -249,7 +232,17 @@ const Index = () => {
     });
   };
   
-  // Simulate playback progress
+  const formatTime = (beats: number): string => {
+    const seconds = (beats * 60) / bpm;
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = Math.floor(seconds % 60);
+    const milliseconds = Math.floor((seconds % 1) * 1000);
+    return `${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}:${milliseconds.toString().padStart(3, '0')}`;
+  };
+
+  const currentTime = formatTime(currentBeat);
+  const totalTime = formatTime(totalBars * beatsPerBar);
+
   useEffect(() => {
     if (!isPlaying) return;
     
@@ -259,21 +252,18 @@ const Index = () => {
         const next = (prev + 0.1) % totalBeats;
         return next;
       });
-    }, 60000 / bpm / 10); // 10 steps per beat for smoother animation
+    }, 60000 / bpm / 10);
     
     return () => clearInterval(interval);
   }, [isPlaying, bpm, beatsPerBar, totalBars]);
   
-  // Handle container click to deselect block
   const handleContainerClick = (e: React.MouseEvent) => {
-    // Only deselect if clicking directly on the container, not on a child
     if (e.currentTarget === e.target) {
       setSelectedBlockId(null);
       setIsDrawerOpen(false);
     }
   };
   
-  // Handle double-click to add a new block
   const handleContainerDoubleClick = (e: React.MouseEvent) => {
     if (e.currentTarget !== e.target) return;
     
@@ -283,7 +273,6 @@ const Index = () => {
     const x = e.clientX - containerRect.left;
     const y = e.clientY - containerRect.top;
     
-    // Calculate track and beat position
     const track = Math.floor(y / trackHeight);
     const startBeat = Math.floor(x / pixelsPerBeat);
     
@@ -300,7 +289,6 @@ const Index = () => {
       
       setBlocks([...blocks, newBlock]);
       
-      // Select the new block
       setSelectedBlockId(newBlock.id);
       setIsDrawerOpen(true);
       
@@ -313,7 +301,6 @@ const Index = () => {
   
   return (
     <div className="flex flex-col h-screen overflow-hidden bg-background text-foreground track-colors-default">
-      {/* Main toolbar */}
       <Toolbar 
         isPlaying={isPlaying}
         bpm={bpm}
@@ -324,11 +311,10 @@ const Index = () => {
         onBpmChange={setBpm}
         onVolumeChange={setMasterVolume}
         onAddTrack={handleAddTrack}
-        usersCount={remoteUsers.length + 1} // +1 for current user
+        usersCount={remoteUsers.length + 1}
       />
       
       <div className="flex flex-grow overflow-hidden">
-        {/* Track list sidebar */}
         <TrackList 
           tracks={tracks}
           onVolumeChange={handleTrackVolumeChange}
@@ -338,24 +324,22 @@ const Index = () => {
           trackHeight={trackHeight}
         />
         
-        {/* Main track view */}
         <div className="flex-grow overflow-hidden flex flex-col">
-          {/* Timeline */}
           <Timeline 
             width={containerWidth}
             pixelsPerBeat={pixelsPerBeat}
             beatsPerBar={beatsPerBar}
             totalBars={totalBars}
+            currentTime={currentTime}
+            totalTime={totalTime}
           />
           
-          {/* Tracks container */}
           <div 
             ref={tracksContainerRef}
             className="flex-grow relative overflow-auto"
             onClick={handleContainerClick}
             onDoubleClick={handleContainerDoubleClick}
           >
-            {/* Vertical track guidelines */}
             <div className="absolute inset-0 pointer-events-none">
               {tracks.map((_, index) => (
                 <div 
@@ -366,7 +350,6 @@ const Index = () => {
               ))}
             </div>
             
-            {/* Render audio blocks */}
             {blocks.map(block => (
               <TrackBlock 
                 key={block.id}
@@ -385,13 +368,11 @@ const Index = () => {
               />
             ))}
             
-            {/* Playhead indicator */}
             <div 
               className="playhead"
               style={{ left: `${currentBeat * pixelsPerBeat}px` }}
             />
             
-            {/* Remote users cursors */}
             {showCollaborators && remoteUsers.map(user => (
               <RemoteUser 
                 key={user.id}
@@ -404,7 +385,6 @@ const Index = () => {
           </div>
         </div>
         
-        {/* Edit drawer */}
         <EditDrawer 
           isOpen={isDrawerOpen}
           onClose={() => setIsDrawerOpen(false)}

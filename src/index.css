@@ -1,58 +1,45 @@
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
   :root {
-    --background: 240 10% 3.9%;
-    --foreground: 0 0% 98%;
-
-    --card: 240 10% 3.9%;
-    --card-foreground: 0 0% 98%;
-
-    --popover: 240 10% 3.9%;
-    --popover-foreground: 0 0% 98%;
-
+    --background: 220 10% 8%;
+    --foreground: 210 40% 98%;
+    
+    --card: 220 10% 10%;
+    --card-foreground: 210 40% 98%;
+    
+    --popover: 220 10% 8%;
+    --popover-foreground: 210 40% 98%;
+    
     --primary: 262 80% 65%;
-    --primary-foreground: 0 0% 98%;
-
-    --secondary: 240 4% 12%;
-    --secondary-foreground: 0 0% 98%;
-
-    --muted: 240 4% 16%;
-    --muted-foreground: 240 5% 65%;
-
-    --accent: 240 4% 16%;
-    --accent-foreground: 0 0% 98%;
-
+    --primary-foreground: 210 40% 98%;
+    
+    --secondary: 220 8% 15%;
+    --secondary-foreground: 210 40% 98%;
+    
+    --muted: 220 8% 20%;
+    --muted-foreground: 220 10% 60%;
+    
+    --accent: 220 8% 20%;
+    --accent-foreground: 210 40% 98%;
+    
     --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 0 0% 98%;
-
-    --border: 240 4% 20%;
-    --input: 240 4% 16%;
-    --ring: 240 5% 65%;
-
+    --destructive-foreground: 210 40% 98%;
+    
+    --border: 220 8% 20%;
+    --input: 220 8% 20%;
+    --ring: 220 10% 60%;
+    
     --radius: 0.5rem;
-
-    --sidebar-background: 240 10% 5.9%;
-    --sidebar-foreground: 0 0% 98%;
-    --sidebar-primary: 262 80% 65%;
-    --sidebar-primary-foreground: 0 0% 98%;
-    --sidebar-accent: 240 4% 16%;
-    --sidebar-accent-foreground: 0 0% 98%;
-    --sidebar-border: 240 4% 20%;
-    --sidebar-ring: 240 5% 65%;
   }
-}
 
-@layer base {
   * {
     @apply border-border;
   }
   body {
-    @apply bg-background text-foreground;
-    font-feature-settings: "rlig" 1, "calt" 1;
+    @apply bg-background text-foreground antialiased;
   }
 }
 
@@ -86,11 +73,18 @@
 }
 
 .waveform-container {
-  background-color: rgba(30, 30, 30, 0.9);
+  background-color: var(--background);
   background-image: 
-    linear-gradient(rgba(60, 60, 60, 0.5) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(60, 60, 60, 0.5) 1px, transparent 1px);
-  background-size: 20px 20px;
+    linear-gradient(to right, 
+      rgba(255, 255, 255, 0.05) 1px, 
+      transparent 1px
+    ),
+    linear-gradient(
+      to bottom,
+      rgba(255, 255, 255, 0.05) 1px,
+      transparent 1px
+    );
+  background-size: 40px 40px;
 }
 
 .playhead {
@@ -107,13 +101,13 @@
   position: absolute;
   top: 0;
   width: 1px;
-  height: 10px;
-  background-color: rgba(255, 255, 255, 0.3);
+  height: 12px;
+  background-color: rgba(255, 255, 255, 0.2);
 }
 
 .timeline-marker.major {
-  height: 15px;
-  background-color: rgba(255, 255, 255, 0.5);
+  height: 20px;
+  background-color: rgba(255, 255, 255, 0.4);
 }
 
 .track-colors-default {
@@ -125,4 +119,21 @@
 
 .drawer-transition {
   transition: transform 0.3s ease-out;
+}
+
+.waveform {
+  background: linear-gradient(180deg, 
+    rgba(146, 151, 179, 0.1) 0%,
+    rgba(120, 160, 180, 0.15) 50%,
+    rgba(90, 140, 180, 0.2) 100%
+  );
+}
+
+.meter-gradient {
+  background: linear-gradient(90deg,
+    #ff2d2d 0%,
+    #ffd700 70%,
+    #00ff00 85%,
+    #00ff00 100%
+  );
 }

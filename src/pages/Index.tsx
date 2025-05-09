@@ -3,11 +3,16 @@ import React, { useState, useEffect, useRef } from 'react';
 import Toolbar from '@/components/Toolbar';
 import TrackList, { TrackInfo } from '@/components/TrackList';
 import TrackBlock from '@/components/TrackBlock';
-import Timeline from '@/components/Timeline';
-import EditDrawer from '@/components/EditDrawer';
+import Timeline, { TimelineMarkerData } from '@/components/Timeline';
+import SettingsDialog from '@/components/SettingsDialog';
 import RemoteUser from '@/components/RemoteUser';
+import ClipEditPopup from '@/components/ClipEditPopup';
+import ToolsMenu from '@/components/ToolsMenu';
 import { toast } from "@/hooks/use-toast";
 import MockWebSocketService from '@/utils/mockWebSocket';
+import { Settings, Record } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { ToolType } from '@/components/ToolsMenu';
 
 interface Block {
   id: string;
@@ -48,12 +53,14 @@ const Index = () => {
   const [masterVolume, setMasterVolume] = useState(80);
   const [currentBeat, setCurrentBeat] = useState(0);
   const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null);
-  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [pixelsPerBeat, setPixelsPerBeat] = useState(40);
   const [trackHeight, setTrackHeight] = useState(80);
   const [beatsPerBar] = useState(4);
   const [totalBars] = useState(16);
-  const [showCollaborators] = useState(true);
+  const [showCollaborators, setShowCollaborators] = useState(true);
+  const [clipPopupPosition, setClipPopupPosition] = useState({ x: 0, y: 0 });
+  const [activeTool, setActiveTool] = useState<ToolType>('select');
   
   const tracksContainerRef = useRef<HTMLDivElement>(null);
   const timelineRef = useRef<HTMLDivElement>(null);
@@ -62,9 +69,24 @@ const Index = () => {
   
   const [horizontalScrollPosition, setHorizontalScrollPosition] = useState(0);
   const [verticalScrollPosition, setVerticalScrollPosition] = useState(0);
+
+  const [settings, setSettings] = useState({
+    snapToGrid: true,
+    gridSize: 1,
+    autoSave: true,
+    showCollaborators: true,
+    theme: 'dark' as const,
+  });
   
   // WebSocket integration
   const [webSocketService] = useState(() => MockWebSocketService.getInstance());
+
+  // Timeline markers
+  const [markers, setMarkers] = useState<TimelineMarkerData[]>([
+    { id: 'marker1', position: 4, color: '#F472B6', icon: 'bookmark', label: 'Intro' },
+    { id: 'marker2', position: 16, color: '#60A5FA', icon: 'flag', label: 'Verse 1' },
+    { id: 'marker3', position: 32, color: '#34D399', icon: 'star', label: 'Chorus' }
+  ]);
   
   useEffect(() => {
     if (!tracksContainerRef.current) return;
@@ -88,10 +110,10 @@ const Index = () => {
   }, []);
   
   const [tracks, setTracks] = useState<TrackInfo[]>([
-    { id: 'track1', name: 'Drums', color: '#FF466A', volume: 80, muted: false, solo: false },
-    { id: 'track2', name: 'Bass', color: '#FFB446', volume: 75, muted: false, solo: false },
-    { id: 'track3', name: 'Synth', color: '#64C850', volume: 70, muted: false, solo: false },
-    { id: 'track4', name: 'Vocals', color: '#5096FF', volume: 85, muted: false, solo: false },
+    { id: 'track1', name: 'Drums', color: '#FF466A', volume: 80, muted: false, solo: false, armed: false },
+    { id: 'track2', name: 'Bass', color: '#FFB446', volume: 75, muted: false, solo: false, armed: false },
+    { id: 'track3', name: 'Synth', color: '#64C850', volume: 70, muted: false, solo: false, armed: false },
+    { id: 'track4', name: 'Vocals', color: '#5096FF', volume: 85, muted: false, solo: false, armed: false },
   ]);
   
   const [blocks, setBlocks] = useState<Block[]>([
@@ -119,8 +141,18 @@ const Index = () => {
       webSocketService.endEditingBlock(selectedBlockId);
     }
     
+    // Position the edit popup
+    if (tracksContainerRef.current && block) {
+      const blockX = block.startBeat * pixelsPerBeat;
+      const blockY = block.track * trackHeight;
+      
+      setClipPopupPosition({
+        x: blockX - horizontalScrollPosition,
+        y: blockY - verticalScrollPosition + trackHeight
+      });
+    }
+    
     setSelectedBlockId(id);
-    setIsDrawerOpen(true);
     
     // Start editing new block
     webSocketService.startEditingBlock(id);
@@ -147,11 +179,17 @@ const Index = () => {
       });
       return;
     }
+
+    // Apply grid snapping if enabled
+    let adjustedStartBeat = newStartBeat;
+    if (settings.snapToGrid) {
+      adjustedStartBeat = Math.round(newStartBeat / settings.gridSize) * settings.gridSize;
+    }
     
     setBlocks(prevBlocks => 
       prevBlocks.map(block => 
         block.id === id 
-          ? { ...block, track: newTrack, startBeat: newStartBeat } 
+          ? { ...block, track: newTrack, startBeat: adjustedStartBeat } 
           : block
       )
     );
@@ -160,15 +198,22 @@ const Index = () => {
     webSocketService.sendMessage('blockUpdate', { 
       id, 
       track: newTrack, 
-      startBeat: newStartBeat 
+      startBeat: adjustedStartBeat 
     });
   };
   
   const handleBlockLengthChange = (id: string, newLength: number) => {
+    // Apply grid snapping if enabled
+    let adjustedLength = newLength;
+    if (settings.snapToGrid) {
+      adjustedLength = Math.max(settings.gridSize, 
+        Math.round(newLength / settings.gridSize) * settings.gridSize);
+    }
+    
     setBlocks(prevBlocks => 
       prevBlocks.map(block => 
         block.id === id 
-          ? { ...block, lengthBeats: newLength } 
+          ? { ...block, lengthBeats: adjustedLength } 
           : block
       )
     );
@@ -176,7 +221,7 @@ const Index = () => {
     // Send update via WebSocket
     webSocketService.sendMessage('blockUpdate', { 
       id, 
-      lengthBeats: newLength 
+      lengthBeats: adjustedLength 
     });
   };
   
@@ -229,6 +274,16 @@ const Index = () => {
     );
   };
   
+  const handleTrackArmToggle = (trackId: string) => {
+    setTracks(prevTracks => 
+      prevTracks.map(track => 
+        track.id === trackId 
+          ? { ...track, armed: !track.armed } 
+          : track
+      )
+    );
+  };
+  
   const handleAddTrack = () => {
     const newTrackId = `track${tracks.length + 1}`;
     const colors = ['#FF466A', '#FFB446', '#64C850', '#5096FF'];
@@ -242,7 +297,8 @@ const Index = () => {
         color: newColor, 
         volume: 75, 
         muted: false, 
-        solo: false 
+        solo: false,
+        armed: false
       }
     ]);
     
@@ -305,6 +361,52 @@ const Index = () => {
     });
   };
   
+  const handleAddMarker = (marker: Omit<TimelineMarkerData, 'id'>) => {
+    const newMarker = {
+      id: `marker${Date.now()}`,
+      ...marker
+    };
+    
+    setMarkers([...markers, newMarker]);
+    
+    toast({
+      title: "Marker Added",
+      description: `Marker "${marker.label || 'New marker'}" has been added to the timeline.`,
+    });
+  };
+  
+  const handleEditMarker = (id: string, changes: Partial<TimelineMarkerData>) => {
+    setMarkers(prevMarkers => 
+      prevMarkers.map(marker => 
+        marker.id === id 
+          ? { ...marker, ...changes } 
+          : marker
+      )
+    );
+  };
+  
+  const handleDeleteMarker = (id: string) => {
+    setMarkers(prevMarkers => prevMarkers.filter(marker => marker.id !== id));
+    
+    toast({
+      title: "Marker Deleted",
+      description: "The timeline marker has been removed.",
+      variant: "destructive",
+    });
+  };
+
+  const handleSettingsChange = (key: string, value: any) => {
+    setSettings(prev => ({
+      ...prev,
+      [key]: value
+    }));
+    
+    // Apply specific setting changes
+    if (key === 'showCollaborators') {
+      setShowCollaborators(value);
+    }
+  };
+  
   const formatTime = (beats: number): string => {
     const seconds = (beats * 60) / bpm;
     const minutes = Math.floor(seconds / 60);
@@ -349,16 +451,27 @@ const Index = () => {
       tracksContainerRef.current.scrollTop = scrollTop;
     }
   };
+
+  const handleSeek = (beat: number) => {
+    setCurrentBeat(beat);
+  };
+
+  const handleZoomIn = () => {
+    setPixelsPerBeat(prev => Math.min(prev + 10, 80));
+  };
+
+  const handleZoomOut = () => {
+    setPixelsPerBeat(prev => Math.max(prev - 10, 20));
+  };
   
   const handleContainerClick = (e: React.MouseEvent) => {
     if (e.currentTarget === e.target) {
       setSelectedBlockId(null);
-      setIsDrawerOpen(false);
     }
   };
   
   const handleContainerDoubleClick = (e: React.MouseEvent) => {
-    if (e.currentTarget !== e.target) return;
+    if (e.currentTarget !== e.target || activeTool !== 'select') return;
     
     const containerRect = tracksContainerRef.current?.getBoundingClientRect();
     if (!containerRect) return;
@@ -367,7 +480,12 @@ const Index = () => {
     const y = e.clientY - containerRect.top + verticalScrollPosition;
     
     const track = Math.floor(y / trackHeight);
-    const startBeat = Math.floor(x / pixelsPerBeat);
+    let startBeat = Math.floor(x / pixelsPerBeat);
+    
+    // Apply grid snapping
+    if (settings.snapToGrid) {
+      startBeat = Math.round(startBeat / settings.gridSize) * settings.gridSize;
+    }
     
     // Check if the track is locked
     if (isTrackLocked(track)) {
@@ -385,15 +503,20 @@ const Index = () => {
         name: 'New Clip',
         track,
         startBeat,
-        lengthBeats: 4,
+        lengthBeats: settings.snapToGrid ? settings.gridSize * 4 : 4,
         volume: 75,
         pitch: 0
       };
       
       setBlocks([...blocks, newBlock]);
       
+      // Position popup for the new block
+      setClipPopupPosition({
+        x: (startBeat * pixelsPerBeat) - horizontalScrollPosition,
+        y: (track * trackHeight) - verticalScrollPosition + trackHeight
+      });
+      
       setSelectedBlockId(newBlock.id);
-      setIsDrawerOpen(true);
       
       // Start editing new block
       webSocketService.startEditingBlock(newBlock.id);
@@ -408,16 +531,33 @@ const Index = () => {
     }
   };
   
-  // Update track locked status
-  const tracksWithLockInfo = tracks.map((track, index) => ({
-    ...track,
-    locked: isTrackLocked(index),
-    lockedByUser: blocks.find(
-      block => block.track === index && 
+  // Update track locked status and add user color highlighting for edited tracks
+  const getTrackEditingUserId = (trackIndex: number) => {
+    const editingBlocks = blocks.filter(
+      block => block.track === trackIndex && 
                block.editingUserId && 
                block.editingUserId !== webSocketService.getLocalUserId()
-    )?.editingUserId
-  }));
+    );
+    
+    return editingBlocks.length > 0 ? editingBlocks[0].editingUserId : null;
+  };
+  
+  const tracksWithLockInfo = tracks.map((track, index) => {
+    const editingUserId = getTrackEditingUserId(index);
+    return {
+      ...track,
+      locked: !!editingUserId,
+      lockedByUser: editingUserId
+    };
+  });
+
+  // Get the user color of who is editing a track
+  const getUserColor = (userId: string | null | undefined): string => {
+    if (!userId) return '';
+    
+    const user = remoteUsers.find(u => u.id === userId);
+    return user ? user.color : '#888888';
+  };
   
   // Setup WebSocket listeners
   useEffect(() => {
@@ -428,7 +568,6 @@ const Index = () => {
         setBlocks(prevBlocks => prevBlocks.filter(block => block.id !== data.id));
         if (selectedBlockId === data.id) {
           setSelectedBlockId(null);
-          setIsDrawerOpen(false);
         }
         return;
       }
@@ -513,6 +652,25 @@ const Index = () => {
         usersCount={remoteUsers.length + 1}
       />
       
+      <div className="flex justify-between px-4 py-2 bg-secondary border-b border-border">
+        <ToolsMenu 
+          activeTool={activeTool}
+          onChangeTool={setActiveTool}
+          onZoomIn={handleZoomIn}
+          onZoomOut={handleZoomOut}
+        />
+        
+        <Button 
+          variant="ghost" 
+          size="sm" 
+          onClick={() => setIsSettingsOpen(true)}
+          className="flex items-center space-x-1"
+        >
+          <Settings size={16} className="mr-1" />
+          Settings
+        </Button>
+      </div>
+      
       <div className="flex flex-grow overflow-hidden">
         <TrackList 
           ref={trackListRef}
@@ -520,6 +678,7 @@ const Index = () => {
           onVolumeChange={handleTrackVolumeChange}
           onMuteToggle={handleTrackMuteToggle}
           onSoloToggle={handleTrackSoloToggle}
+          onArmToggle={handleTrackArmToggle}
           onRename={() => {}}
           trackHeight={trackHeight}
           scrollTop={verticalScrollPosition}
@@ -535,6 +694,11 @@ const Index = () => {
             totalBars={totalBars}
             currentTime={currentTime}
             totalTime={totalTime}
+            markers={markers}
+            onAddMarker={handleAddMarker}
+            onEditMarker={handleEditMarker}
+            onDeleteMarker={handleDeleteMarker}
+            onSeek={handleSeek}
             scrollLeft={horizontalScrollPosition}
             onTimelineScroll={handleTimelineScroll}
           />
@@ -550,13 +714,34 @@ const Index = () => {
               className="absolute inset-0 pointer-events-none"
               style={{ width: `${totalBars * beatsPerBar * pixelsPerBeat}px` }}
             >
-              {tracks.map((_, index) => (
-                <div 
-                  key={index}
-                  className="absolute left-0 right-0 border-b border-border"
-                  style={{ top: `${(index + 1) * trackHeight}px` }}
-                />
-              ))}
+              {tracks.map((_, index) => {
+                const editingUserId = getTrackEditingUserId(index);
+                const userColor = getUserColor(editingUserId);
+                
+                return (
+                  <div key={index} className="track-edited-by-user">
+                    <div 
+                      className="absolute left-0 right-0 border-b border-border"
+                      style={{ 
+                        top: `${(index + 1) * trackHeight}px`,
+                      }}
+                    />
+                    {editingUserId && (
+                      <div 
+                        className="absolute pointer-events-none"
+                        style={{
+                          top: `${index * trackHeight}px`,
+                          left: 0,
+                          right: 0,
+                          height: `${trackHeight}px`,
+                          backgroundColor: userColor,
+                          opacity: 0.1
+                        }}
+                      />
+                    )}
+                  </div>
+                );
+              })}
             </div>
             
             {blocks.map(block => (
@@ -575,6 +760,7 @@ const Index = () => {
                 trackHeight={trackHeight}
                 editingUserId={block.editingUserId}
                 isTrackLocked={isTrackLocked(block.track) && block.editingUserId !== webSocketService.getLocalUserId()}
+                activeTool={activeTool}
               />
             ))}
             
@@ -597,27 +783,36 @@ const Index = () => {
                 color={user.color}
               />
             ))}
+            
+            {selectedBlockId && selectedBlock && (
+              <ClipEditPopup
+                blockId={selectedBlockId}
+                name={selectedBlock.name}
+                volume={selectedBlock.volume}
+                pitch={selectedBlock.pitch}
+                position={clipPopupPosition}
+                onNameChange={handleBlockNameChange}
+                onVolumeChange={handleBlockVolumeChange}
+                onPitchChange={handleBlockPitchChange}
+                onDelete={handleDeleteBlock}
+                onClose={() => {
+                  setSelectedBlockId(null);
+                  if (selectedBlockId) {
+                    webSocketService.endEditingBlock(selectedBlockId);
+                  }
+                }}
+              />
+            )}
           </div>
         </div>
-        
-        <EditDrawer 
-          isOpen={isDrawerOpen}
-          onClose={() => {
-            setIsDrawerOpen(false);
-            if (selectedBlockId) {
-              webSocketService.endEditingBlock(selectedBlockId);
-              setSelectedBlockId(null);
-            }
-          }}
-          selectedBlock={selectedBlock || null}
-          onNameChange={handleBlockNameChange}
-          onVolumeChange={handleBlockVolumeChange}
-          onPitchChange={handleBlockPitchChange}
-          onDelete={handleDeleteBlock}
-          volume={selectedBlock?.volume || 75}
-          pitch={selectedBlock?.pitch || 0}
-        />
       </div>
+
+      <SettingsDialog
+        open={isSettingsOpen}
+        onOpenChange={setIsSettingsOpen}
+        settings={settings}
+        onSettingsChange={handleSettingsChange}
+      />
     </div>
   );
 };

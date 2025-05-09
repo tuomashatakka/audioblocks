@@ -1,222 +1,153 @@
 
 import { toast } from "@/hooks/use-toast";
-
-// Simple EventEmitter implementation for browsers
-class EventEmitter {
-  private events: Record<string, Function[]> = {};
-
-  on(event: string, listener: Function): void {
-    if (!this.events[event]) {
-      this.events[event] = [];
-    }
-    this.events[event].push(listener);
-  }
-
-  off(event: string, listener: Function): void {
-    if (!this.events[event]) return;
-    this.events[event] = this.events[event].filter(l => l !== listener);
-  }
-
-  emit(event: string, ...args: any[]): void {
-    if (!this.events[event]) return;
-    this.events[event].forEach(listener => {
-      listener(...args);
-    });
-  }
-}
+import { EventEmitter } from "./eventEmitter";
 
 interface WebSocketMessage {
-  type: 'blockUpdate' | 'blockEditing' | 'blockEditingEnd' | 'cursorMove';
+  type: string;
   data: any;
   timestamp: number;
-  userId: string;
 }
 
-interface QueuedMessage extends WebSocketMessage {
-  id: string;
-}
-
-// Mock implementation of a WebSocket service
 class MockWebSocketService extends EventEmitter {
   private static instance: MockWebSocketService;
-  private isConnected: boolean = true;
-  private messageQueue: QueuedMessage[] = [];
-  private localUserId: string = 'local-user';
-  private remoteMessageQueue: QueuedMessage[] = [];
-  private lastProcessedTimestamp: number = 0;
-  
+  private localUserId: string;
+  private connected: boolean = true;
+  private messageQueue: WebSocketMessage[] = [];
+  private localMessageQueue: WebSocketMessage[] = [];
+  private lastSyncTimestamp: number = Date.now();
+
   private constructor() {
     super();
-    console.log('WebSocket service initialized');
+    this.localUserId = `local-${Math.random().toString(36).substr(2, 9)}`;
     
-    // Simulate occasional connection drops
+    // Simulate network issues every 30-60 seconds
     setInterval(() => {
-      if (Math.random() > 0.95) {
-        this.simulateConnectionDrop();
+      if (Math.random() > 0.7) {
+        this.simulateNetworkIssue();
       }
     }, 30000);
   }
-  
+
   public static getInstance(): MockWebSocketService {
     if (!MockWebSocketService.instance) {
       MockWebSocketService.instance = new MockWebSocketService();
     }
     return MockWebSocketService.instance;
   }
-  
-  public connect(): void {
-    if (!this.isConnected) {
-      this.isConnected = true;
-      console.log('WebSocket reconnected');
+
+  public getLocalUserId(): string {
+    return this.localUserId;
+  }
+
+  public sendMessage(type: string, data: any): void {
+    if (!this.connected) {
+      this.queueLocalMessage(type, data);
       toast({
-        title: "Connection Restored",
-        description: "Real-time collaboration is now active.",
-      });
-      
-      // Process any queued messages that came in while disconnected
-      this.synchronizeState();
-    }
-  }
-  
-  private simulateConnectionDrop(): void {
-    this.isConnected = false;
-    console.log('WebSocket connection dropped');
-    toast({
         title: "Connection Lost",
-        description: "Attempting to reconnect...",
+        description: "Your changes will be synchronized when the connection is restored.",
         variant: "destructive",
-    });
-    
-    // Simulate reconnection after some delay
-    setTimeout(() => this.connect(), Math.random() * 3000 + 1000);
-  }
-  
-  public sendMessage(type: WebSocketMessage['type'], data: any): void {
-    if (!this.isConnected) {
-      console.log('Cannot send message: WebSocket disconnected');
+      });
       return;
     }
-    
+
     const message: WebSocketMessage = {
       type,
       data,
       timestamp: Date.now(),
-      userId: this.localUserId
     };
+
+    this.messageQueue.push(message);
     
-    console.log('Sending message:', message);
-    
-    // Add to local queue
-    const queuedMessage: QueuedMessage = {
-      ...message,
-      id: `${this.localUserId}-${message.timestamp}-${Math.random().toString(36).substr(2, 9)}`
-    };
-    this.messageQueue.push(queuedMessage);
-    
-    // Process immediately
+    // Simulate latency
     setTimeout(() => {
-      this.processMessage(queuedMessage);
-    }, 10);
-    
-    // Simulate sending to other users with small delay
-    setTimeout(() => {
-      this.simulateRemoteMessages(queuedMessage);
-    }, Math.random() * 100 + 50);
+      this.emit(type, message);
+    }, Math.random() * 100);
   }
-  
-  private simulateRemoteMessages(originatingMessage: QueuedMessage): void {
-    // Simulate other users' edits
-    if (Math.random() > 0.7 && originatingMessage.type === 'blockUpdate') {
-      const remoteUsers = ['user1', 'user2'];
-      const randomUser = remoteUsers[Math.floor(Math.random() * remoteUsers.length)];
-      
-      const remoteMessage: QueuedMessage = {
-        type: 'blockUpdate',
-        data: {
-          ...originatingMessage.data,
-          id: `block${Date.now()}`, // Different block
-        },
-        timestamp: Date.now(),
-        userId: randomUser,
-        id: `${randomUser}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
-      };
-      
-      this.remoteMessageQueue.push(remoteMessage);
-      this.processRemoteMessage(remoteMessage);
-    }
-  }
-  
-  private processMessage(message: QueuedMessage): void {
-    console.log('Processing message:', message);
-    this.emit(message.type, message);
-  }
-  
-  private processRemoteMessage(message: QueuedMessage): void {
-    if (!this.isConnected) {
-      console.log('Queuing remote message for later processing:', message);
-      return;
-    }
-    
-    // Check timestamp ordering
-    if (message.timestamp < this.lastProcessedTimestamp) {
-      console.log('Received out-of-order message. Need to reapply changes.');
-      this.rollbackAndReapply(message.timestamp);
-    }
-    
-    console.log('Processing remote message:', message);
-    this.lastProcessedTimestamp = message.timestamp;
-    this.emit(message.type, message);
-  }
-  
-  private synchronizeState(): void {
-    if (this.remoteMessageQueue.length > 0) {
-      console.log('Synchronizing state with remote messages:', this.remoteMessageQueue);
-      
-      // Find earliest remote message timestamp
-      const earliestTimestamp = Math.min(
-        ...this.remoteMessageQueue.map(msg => msg.timestamp)
-      );
-      
-      // Roll back local state and reapply changes
-      this.rollbackAndReapply(earliestTimestamp);
-      
-      // Process all remote messages in timestamp order
-      const sortedMessages = [...this.remoteMessageQueue].sort(
-        (a, b) => a.timestamp - b.timestamp
-      );
-      
-      sortedMessages.forEach(message => {
-        this.processRemoteMessage(message);
-      });
-      
-      this.remoteMessageQueue = [];
-    }
-  }
-  
-  private rollbackAndReapply(timestamp: number): void {
-    console.log(`Rolling back to ${new Date(timestamp).toISOString()} and reapplying changes`);
-    this.emit('rollback', timestamp);
-    
-    // After rollback, reapply local messages that came after the timestamp
-    const messagesToReapply = this.messageQueue
-      .filter(msg => msg.timestamp > timestamp)
-      .sort((a, b) => a.timestamp - b.timestamp);
-    
-    messagesToReapply.forEach(message => {
-      this.processMessage(message);
-    });
-  }
-  
+
   public startEditingBlock(blockId: string): void {
     this.sendMessage('blockEditing', { blockId, userId: this.localUserId });
   }
-  
+
   public endEditingBlock(blockId: string): void {
-    this.sendMessage('blockEditingEnd', { blockId });
+    this.sendMessage('blockEditingEnd', { blockId, userId: this.localUserId });
   }
-  
-  public getLocalUserId(): string {
-    return this.localUserId;
+
+  private queueLocalMessage(type: string, data: any): void {
+    const message: WebSocketMessage = {
+      type,
+      data,
+      timestamp: Date.now(),
+    };
+    this.localMessageQueue.push(message);
+  }
+
+  private simulateNetworkIssue(): void {
+    if (!this.connected) return;
+    
+    console.log('Simulating network disconnection...');
+    this.connected = false;
+    
+    toast({
+      title: "Connection Lost",
+      description: "Trying to reconnect...",
+      variant: "destructive",
+    });
+    
+    // Store the last time we were in sync
+    this.lastSyncTimestamp = Date.now();
+    
+    // Reconnect after 2-5 seconds
+    setTimeout(() => {
+      this.reconnect();
+    }, 2000 + Math.random() * 3000);
+  }
+
+  private reconnect(): void {
+    console.log('Reconnecting...');
+    this.connected = true;
+    
+    toast({
+      title: "Connection Restored",
+      description: "Synchronizing changes...",
+    });
+    
+    // Check if there are newer messages from the server that we missed
+    const newerMessages = this.messageQueue.filter(
+      msg => msg.timestamp > this.lastSyncTimestamp && 
+             msg.data.userId !== this.localUserId
+    );
+    
+    if (newerMessages.length > 0) {
+      console.log('Found newer messages from server, rolling back...');
+      
+      // Find the oldest message timestamp
+      const oldestTimestamp = Math.min(
+        ...newerMessages.map(msg => msg.timestamp)
+      );
+      
+      // Emit rollback event
+      this.emit('rollback', oldestTimestamp);
+      
+      // Replay all messages in order
+      const allMessages = [...newerMessages, ...this.localMessageQueue]
+        .sort((a, b) => a.timestamp - b.timestamp);
+      
+      // Wait a bit then replay the messages
+      setTimeout(() => {
+        allMessages.forEach(msg => {
+          this.emit(msg.type, msg);
+        });
+        
+        // Clear local queue
+        this.localMessageQueue = [];
+      }, 500);
+    } else {
+      // Just send local changes
+      this.localMessageQueue.forEach(msg => {
+        this.sendMessage(msg.type, msg.data);
+      });
+      this.localMessageQueue = [];
+    }
   }
 }
 

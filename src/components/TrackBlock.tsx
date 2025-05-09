@@ -17,6 +17,7 @@ export interface TrackBlockProps {
   trackHeight: number;
   editingUserId?: string | null;
   isTrackLocked?: boolean;
+  activeTool?: 'select' | 'pan' | 'boxSelect';
 }
 
 const TrackBlock: React.FC<TrackBlockProps> = ({
@@ -32,11 +33,14 @@ const TrackBlock: React.FC<TrackBlockProps> = ({
   pixelsPerBeat,
   trackHeight,
   editingUserId,
-  isTrackLocked
+  isTrackLocked,
+  activeTool = 'select'
 }) => {
   const [isDragging, setIsDragging] = useState(false);
   const [isResizing, setIsResizing] = useState(false);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+  const [initialPos, setInitialPos] = useState({ track, startBeat });
+  const [initialLength, setInitialLength] = useState(lengthBeats);
   const blockRef = useRef<HTMLDivElement>(null);
   
   const [waveformPattern, setWaveformPattern] = useState<number[]>([]);
@@ -51,7 +55,7 @@ const TrackBlock: React.FC<TrackBlockProps> = ({
   const handleMouseDown = (e: React.MouseEvent) => {
     e.stopPropagation();
     
-    if (isTrackLocked) {
+    if (isTrackLocked || activeTool !== 'select') {
       return;
     }
     
@@ -62,6 +66,8 @@ const TrackBlock: React.FC<TrackBlockProps> = ({
     }
     
     setIsDragging(true);
+    setInitialPos({ track, startBeat });
+    
     if (blockRef.current) {
       const rect = blockRef.current.getBoundingClientRect();
       setDragOffset({
@@ -75,13 +81,14 @@ const TrackBlock: React.FC<TrackBlockProps> = ({
   };
   
   const handleResizeMouseDown = (e: React.MouseEvent) => {
-    if (isTrackLocked) {
+    if (isTrackLocked || activeTool !== 'select') {
       return;
     }
     
     e.stopPropagation();
     e.preventDefault();
     setIsResizing(true);
+    setInitialLength(lengthBeats);
     
     document.addEventListener('mousemove', handleResizeMouseMove);
     document.addEventListener('mouseup', handleResizeMouseUp);
@@ -94,8 +101,8 @@ const TrackBlock: React.FC<TrackBlockProps> = ({
     if (!container) return;
     
     const containerRect = container.getBoundingClientRect();
-    const x = e.clientX - containerRect.left - dragOffset.x;
-    const y = e.clientY - containerRect.top - dragOffset.y;
+    const x = e.clientX - containerRect.left - dragOffset.x + container.scrollLeft;
+    const y = e.clientY - containerRect.top - dragOffset.y + container.scrollTop;
     
     const newTrack = Math.max(0, Math.floor(y / trackHeight));
     const newBeat = Math.max(0, Math.round(x / pixelsPerBeat));
@@ -114,8 +121,8 @@ const TrackBlock: React.FC<TrackBlockProps> = ({
     const containerRect = container.getBoundingClientRect();
     const blockRect = blockRef.current.getBoundingClientRect();
     
-    const rightEdge = e.clientX - containerRect.left;
-    const blockLeft = blockRect.left - containerRect.left;
+    const rightEdge = e.clientX - containerRect.left + container.scrollLeft;
+    const blockLeft = startBeat * pixelsPerBeat;
     const newWidthPixels = Math.max(pixelsPerBeat, rightEdge - blockLeft);
     const newLengthBeats = Math.max(1, Math.round(newWidthPixels / pixelsPerBeat));
     
@@ -149,6 +156,8 @@ const TrackBlock: React.FC<TrackBlockProps> = ({
     return colors[hash % colors.length];
   };
 
+  const canInteract = activeTool === 'select' && !isTrackLocked;
+  
   return (
     <div
       ref={blockRef}
@@ -158,13 +167,13 @@ const TrackBlock: React.FC<TrackBlockProps> = ({
         selected ? "border-primary shadow-lg" : "border-transparent",
         isDragging ? "dragging" : "",
         editingUserId && !selected ? `ring-2 ring-offset-1` : "",
-        isTrackLocked ? "opacity-70 cursor-not-allowed" : ""
+        isTrackLocked ? "opacity-70 cursor-not-allowed" : canInteract ? "cursor-move" : "cursor-default"
       )}
       style={blockStyle}
       onMouseDown={handleMouseDown}
       onClick={(e) => {
         e.stopPropagation();
-        if (!isTrackLocked) {
+        if (!isTrackLocked && activeTool === 'select') {
           onSelect(id);
         }
       }}
@@ -205,7 +214,10 @@ const TrackBlock: React.FC<TrackBlockProps> = ({
       )}
       
       <div 
-        className={`resize-handle absolute right-0 top-0 bottom-0 w-2 ${isTrackLocked ? 'cursor-not-allowed' : 'cursor-col-resize'}`}
+        className={cn(
+          "resize-handle absolute right-0 top-0 bottom-0 w-2",
+          canInteract ? "cursor-col-resize" : "cursor-not-allowed"
+        )}
         onMouseDown={handleResizeMouseDown}
       />
     </div>

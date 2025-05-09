@@ -1,3 +1,4 @@
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -41,6 +42,17 @@
   body {
     @apply bg-background text-foreground antialiased;
   }
+}
+
+/* Global gradient overlay */
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(242,245,139,0.05) 0%, rgba(148,197,20,0.05) 30%, rgba(223,234,247,0.05) 70%, rgba(244,248,252,0.05) 100%);
+  mix-blend-mode: screen;
+  pointer-events: none;
+  z-index: 1000;
 }
 
 .track-block {
@@ -136,4 +148,88 @@
     #00ff00 85%,
     #00ff00 100%
   );
+}
+
+.track-edited-by-user {
+  position: relative;
+}
+
+.track-edited-by-user::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  opacity: 0.15;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.timeline-marker-container {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 100%;
+  pointer-events: none;
+}
+
+.timeline-marker-item {
+  position: absolute;
+  top: 20px;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.timeline-marker-item:hover .timeline-marker-line {
+  height: 100%;
+  opacity: 0.5;
+}
+
+.timeline-marker-line {
+  width: 2px;
+  height: 40px;
+  background-color: currentColor;
+  opacity: 0.3;
+  transition: height 0.2s, opacity 0.2s;
+}
+
+.timeline-marker-icon {
+  margin-top: -8px;
+  background-color: var(--background);
+  border-radius: 50%;
+  padding: 2px;
+}
+
+.timeline-marker-label {
+  font-size: 10px;
+  white-space: nowrap;
+  background-color: var(--background);
+  padding: 2px 4px;
+  border-radius: 3px;
+  margin-top: 2px;
+  opacity: 0.8;
+}
+
+.clip-edit-popup {
+  position: absolute;
+  z-index: 100;
+  min-width: 200px;
+  border-radius: var(--radius);
+  background-color: hsl(var(--background));
+  border: 1px solid hsl(var(--border));
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
+  animation: scale-in 0.2s ease-out;
+}
+
+@keyframes scale-in {
+  from { transform: scale(0.95); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+
+.tool-active {
+  background-color: hsl(var(--accent));
+  color: hsl(var(--accent-foreground));
 }

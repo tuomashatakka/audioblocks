@@ -1,8 +1,9 @@
-
 import React, { forwardRef } from 'react';
 import { Mic, Volume2, Lock } from 'lucide-react';
 import { Slider } from "@/components/ui/slider";
 import { Button } from "@/components/ui/button";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { Record } from './Record';
 
 export interface TrackInfo {
   id: string;
@@ -11,6 +12,7 @@ export interface TrackInfo {
   volume: number;
   muted: boolean;
   solo: boolean;
+  armed?: boolean;
   locked?: boolean;
   lockedByUser?: string;
 }
@@ -20,6 +22,7 @@ interface TrackListProps {
   onVolumeChange: (trackId: string, volume: number) => void;
   onMuteToggle: (trackId: string) => void;
   onSoloToggle: (trackId: string) => void;
+  onArmToggle?: (trackId: string) => void;
   onRename: (trackId: string, name: string) => void;
   trackHeight: number;
   scrollTop?: number;
@@ -31,6 +34,7 @@ const TrackList = forwardRef<HTMLDivElement, TrackListProps>(({
   onVolumeChange,
   onMuteToggle,
   onSoloToggle,
+  onArmToggle,
   onRename,
   trackHeight,
   scrollTop,
@@ -73,25 +77,50 @@ const TrackList = forwardRef<HTMLDivElement, TrackListProps>(({
                     <Lock className="h-3 w-3" />
                   </div>
                 )}
-                <Button
-                  variant={track.muted ? "secondary" : "ghost"}
-                  size="icon"
-                  className="h-5 w-5"
-                  onClick={() => onMuteToggle(track.id)}
+              </div>
+            </div>
+            
+            <div className="flex items-center justify-between mb-2">
+              <ToggleGroup type="multiple" className="gap-0">
+                <ToggleGroupItem 
+                  value="mute" 
+                  size="sm"
+                  className="h-6 w-6 p-0" 
+                  aria-label="Mute"
                   disabled={track.locked}
+                  pressed={track.muted}
+                  onClick={() => onMuteToggle(track.id)}
                 >
                   <Volume2 className="h-3 w-3" />
-                </Button>
-                <Button
-                  variant={track.solo ? "secondary" : "ghost"}
-                  size="icon"
-                  className="h-5 w-5"
-                  onClick={() => onSoloToggle(track.id)}
+                </ToggleGroupItem>
+                
+                <ToggleGroupItem 
+                  value="solo" 
+                  size="sm"
+                  className="h-6 w-6 p-0" 
+                  aria-label="Solo"
                   disabled={track.locked}
+                  pressed={track.solo}
+                  onClick={() => onSoloToggle(track.id)}
                 >
                   <Mic className="h-3 w-3" />
-                </Button>
-              </div>
+                </ToggleGroupItem>
+                
+                {onArmToggle && (
+                  <ToggleGroupItem 
+                    value="arm" 
+                    size="sm"
+                    className="h-6 w-6 p-0" 
+                    aria-label="Record Arm"
+                    variant="destructive"
+                    disabled={track.locked}
+                    pressed={track.armed}
+                    onClick={() => onArmToggle(track.id)}
+                  >
+                    <Record className="h-3 w-3" />
+                  </ToggleGroupItem>
+                )}
+              </ToggleGroup>
             </div>
             
             <div className="flex items-center">

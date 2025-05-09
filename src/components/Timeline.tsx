@@ -64,7 +64,7 @@ const Timeline = forwardRef<HTMLDivElement, TimelineProps>(({
       <div 
         ref={ref}
         className="h-full relative mt-8 overflow-x-auto"
-        style={{ scrollLeft: scrollLeft ?? 0 }}
+        style={{ scrollLeft: scrollLeft || 0 } as React.CSSProperties}
         onScroll={handleScroll}
       >
         <div className="h-full relative" style={{ width: `${totalBeats * pixelsPerBeat}px` }}>

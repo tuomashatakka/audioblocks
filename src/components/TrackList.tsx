@@ -52,7 +52,7 @@ const TrackList = forwardRef<HTMLDivElement, TrackListProps>(({
       <div 
         ref={ref}
         className="tracks-list flex-grow overflow-y-auto"
-        style={{ scrollTop: scrollTop ?? 0 }}
+        style={{ scrollTop: scrollTop || 0 } as React.CSSProperties}
         onScroll={handleScroll}
       >
         {tracks.map((track, index) => (

@@ -1,7 +1,5 @@
-
 import React from 'react';
 import { 
-  Record, 
   Flag, 
   Bookmark, 
   Star,
@@ -10,6 +8,7 @@ import {
   Zap,
   MessageCircle
 } from 'lucide-react';
+import { Record } from './Record';
 import { 
   Tooltip,
   TooltipContent,

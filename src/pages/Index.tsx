@@ -10,7 +10,8 @@ import ClipEditPopup from '@/components/ClipEditPopup';
 import ToolsMenu from '@/components/ToolsMenu';
 import { toast } from "@/hooks/use-toast";
 import MockWebSocketService from '@/utils/mockWebSocket';
-import { Settings, Record } from 'lucide-react';
+import { Settings } from 'lucide-react';
+import { Record } from '@/components/Record';
 import { Button } from '@/components/ui/button';
 import { ToolType } from '@/components/ToolsMenu';
 

@@ -3,7 +3,7 @@ import React from "react";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import { Select, ZoomIn, ZoomOut, BoxSelect } from "lucide-react";
+import { MousePointer, ZoomIn, ZoomOut, BoxSelect } from "lucide-react";
 
 export type ToolType = "select" | "pan" | "boxSelect";
 
@@ -23,7 +23,7 @@ const ToolsMenu: React.FC<ToolsMenuProps> = ({
   const tools = [
     {
       id: "select" as const,
-      icon: <Select size={16} />,
+      icon: <MousePointer size={16} />,
       name: "Select & Resize",
       tooltip: "Select, move and resize clips",
       shortcut: "V",

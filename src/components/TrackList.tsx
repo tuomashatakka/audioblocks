@@ -1,3 +1,4 @@
+
 import React, { forwardRef } from 'react';
 import { Mic, Volume2, Lock } from 'lucide-react';
 import { Slider } from "@/components/ui/slider";
@@ -88,7 +89,7 @@ const TrackList = forwardRef<HTMLDivElement, TrackListProps>(({
                   className="h-6 w-6 p-0" 
                   aria-label="Mute"
                   disabled={track.locked}
-                  pressed={track.muted}
+                  data-state={track.muted ? "on" : "off"}
                   onClick={() => onMuteToggle(track.id)}
                 >
                   <Volume2 className="h-3 w-3" />
@@ -100,7 +101,7 @@ const TrackList = forwardRef<HTMLDivElement, TrackListProps>(({
                   className="h-6 w-6 p-0" 
                   aria-label="Solo"
                   disabled={track.locked}
-                  pressed={track.solo}
+                  data-state={track.solo ? "on" : "off"}
                   onClick={() => onSoloToggle(track.id)}
                 >
                   <Mic className="h-3 w-3" />
@@ -112,9 +113,9 @@ const TrackList = forwardRef<HTMLDivElement, TrackListProps>(({
                     size="sm"
                     className="h-6 w-6 p-0" 
                     aria-label="Record Arm"
-                    variant="destructive"
+                    variant="default"
                     disabled={track.locked}
-                    pressed={track.armed}
+                    data-state={track.armed ? "on" : "off"}
                     onClick={() => onArmToggle(track.id)}
                   >
                     <Record className="h-3 w-3" />

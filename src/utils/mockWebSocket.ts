@@ -1,6 +1,29 @@
 
 import { toast } from "@/hooks/use-toast";
-import { EventEmitter } from "events";
+
+// Simple EventEmitter implementation for browsers
+class EventEmitter {
+  private events: Record<string, Function[]> = {};
+
+  on(event: string, listener: Function): void {
+    if (!this.events[event]) {
+      this.events[event] = [];
+    }
+    this.events[event].push(listener);
+  }
+
+  off(event: string, listener: Function): void {
+    if (!this.events[event]) return;
+    this.events[event] = this.events[event].filter(l => l !== listener);
+  }
+
+  emit(event: string, ...args: any[]): void {
+    if (!this.events[event]) return;
+    this.events[event].forEach(listener => {
+      listener(...args);
+    });
+  }
+}
 
 interface WebSocketMessage {
   type: 'blockUpdate' | 'blockEditing' | 'blockEditingEnd' | 'cursorMove';

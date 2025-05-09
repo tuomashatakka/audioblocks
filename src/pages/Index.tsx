@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import Toolbar from '@/components/Toolbar';
 import TrackList, { TrackInfo } from '@/components/TrackList';
@@ -6,6 +7,7 @@ import Timeline from '@/components/Timeline';
 import EditDrawer from '@/components/EditDrawer';
 import RemoteUser from '@/components/RemoteUser';
 import { toast } from "@/hooks/use-toast";
+import MockWebSocketService from '@/utils/mockWebSocket';
 
 interface Block {
   id: string;
@@ -54,7 +56,15 @@ const Index = () => {
   const [showCollaborators] = useState(true);
   
   const tracksContainerRef = useRef<HTMLDivElement>(null);
+  const timelineRef = useRef<HTMLDivElement>(null);
+  const trackListRef = useRef<HTMLDivElement>(null);
   const [containerWidth, setContainerWidth] = useState(0);
+  
+  const [horizontalScrollPosition, setHorizontalScrollPosition] = useState(0);
+  const [verticalScrollPosition, setVerticalScrollPosition] = useState(0);
+  
+  // WebSocket integration
+  const [webSocketService] = useState(() => MockWebSocketService.getInstance());
   
   useEffect(() => {
     if (!tracksContainerRef.current) return;
@@ -93,13 +103,51 @@ const Index = () => {
   ]);
   
   const handleSelectBlock = (id: string) => {
+    // Check if the block is being edited by someone else
+    const block = blocks.find(block => block.id === id);
+    if (block?.editingUserId && block.editingUserId !== webSocketService.getLocalUserId()) {
+      toast({
+        title: "Block is being edited",
+        description: `This clip is currently being edited by another user.`,
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    // End editing previous block
+    if (selectedBlockId) {
+      webSocketService.endEditingBlock(selectedBlockId);
+    }
+    
     setSelectedBlockId(id);
     setIsDrawerOpen(true);
+    
+    // Start editing new block
+    webSocketService.startEditingBlock(id);
   };
   
   const selectedBlock = blocks.find(block => block.id === selectedBlockId);
   
+  // Check if a track is locked (has a block being edited by someone else)
+  const isTrackLocked = (trackIndex: number): boolean => {
+    return blocks.some(
+      block => block.track === trackIndex && 
+               block.editingUserId && 
+               block.editingUserId !== webSocketService.getLocalUserId()
+    );
+  };
+  
   const handleBlockPositionChange = (id: string, newTrack: number, newStartBeat: number) => {
+    // Check if the target track is locked
+    if (isTrackLocked(newTrack)) {
+      toast({
+        title: "Track Locked",
+        description: "This track has clips being edited by other users.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
     setBlocks(prevBlocks => 
       prevBlocks.map(block => 
         block.id === id 
@@ -107,6 +155,13 @@ const Index = () => {
           : block
       )
     );
+    
+    // Send update via WebSocket
+    webSocketService.sendMessage('blockUpdate', { 
+      id, 
+      track: newTrack, 
+      startBeat: newStartBeat 
+    });
   };
   
   const handleBlockLengthChange = (id: string, newLength: number) => {
@@ -117,6 +172,12 @@ const Index = () => {
           : block
       )
     );
+    
+    // Send update via WebSocket
+    webSocketService.sendMessage('blockUpdate', { 
+      id, 
+      lengthBeats: newLength 
+    });
   };
   
   const handlePlay = () => {
@@ -199,6 +260,9 @@ const Index = () => {
           : block
       )
     );
+    
+    // Send update via WebSocket
+    webSocketService.sendMessage('blockUpdate', { id, name });
   };
   
   const handleBlockVolumeChange = (id: string, volume: number) => {
@@ -209,6 +273,9 @@ const Index = () => {
           : block
       )
     );
+    
+    // Send update via WebSocket
+    webSocketService.sendMessage('blockUpdate', { id, volume });
   };
   
   const handleBlockPitchChange = (id: string, pitch: number) => {
@@ -219,11 +286,17 @@ const Index = () => {
           : block
       )
     );
+    
+    // Send update via WebSocket
+    webSocketService.sendMessage('blockUpdate', { id, pitch });
   };
   
   const handleDeleteBlock = (id: string) => {
     setBlocks(prevBlocks => prevBlocks.filter(block => block.id !== id));
     setSelectedBlockId(null);
+    
+    // Send update via WebSocket
+    webSocketService.sendMessage('blockUpdate', { id, deleted: true });
     
     toast({
       title: "Clip Deleted",
@@ -257,6 +330,26 @@ const Index = () => {
     return () => clearInterval(interval);
   }, [isPlaying, bpm, beatsPerBar, totalBars]);
   
+  const handleTracksContainerScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    const { scrollLeft, scrollTop } = e.currentTarget;
+    setHorizontalScrollPosition(scrollLeft);
+    setVerticalScrollPosition(scrollTop);
+  };
+  
+  const handleTimelineScroll = (scrollLeft: number) => {
+    setHorizontalScrollPosition(scrollLeft);
+    if (tracksContainerRef.current) {
+      tracksContainerRef.current.scrollLeft = scrollLeft;
+    }
+  };
+  
+  const handleTrackListScroll = (scrollTop: number) => {
+    setVerticalScrollPosition(scrollTop);
+    if (tracksContainerRef.current) {
+      tracksContainerRef.current.scrollTop = scrollTop;
+    }
+  };
+  
   const handleContainerClick = (e: React.MouseEvent) => {
     if (e.currentTarget === e.target) {
       setSelectedBlockId(null);
@@ -270,11 +363,21 @@ const Index = () => {
     const containerRect = tracksContainerRef.current?.getBoundingClientRect();
     if (!containerRect) return;
     
-    const x = e.clientX - containerRect.left;
-    const y = e.clientY - containerRect.top;
+    const x = e.clientX - containerRect.left + horizontalScrollPosition;
+    const y = e.clientY - containerRect.top + verticalScrollPosition;
     
     const track = Math.floor(y / trackHeight);
     const startBeat = Math.floor(x / pixelsPerBeat);
+    
+    // Check if the track is locked
+    if (isTrackLocked(track)) {
+      toast({
+        title: "Track Locked",
+        description: "This track has clips being edited by other users.",
+        variant: "destructive",
+      });
+      return;
+    }
     
     if (track >= 0 && track < tracks.length) {
       const newBlock: Block = {
@@ -292,12 +395,108 @@ const Index = () => {
       setSelectedBlockId(newBlock.id);
       setIsDrawerOpen(true);
       
+      // Start editing new block
+      webSocketService.startEditingBlock(newBlock.id);
+      
+      // Send update via WebSocket
+      webSocketService.sendMessage('blockUpdate', newBlock);
+      
       toast({
         title: "Clip Added",
         description: "A new audio clip has been added to your track.",
       });
     }
   };
+  
+  // Update track locked status
+  const tracksWithLockInfo = tracks.map((track, index) => ({
+    ...track,
+    locked: isTrackLocked(index),
+    lockedByUser: blocks.find(
+      block => block.track === index && 
+               block.editingUserId && 
+               block.editingUserId !== webSocketService.getLocalUserId()
+    )?.editingUserId
+  }));
+  
+  // Setup WebSocket listeners
+  useEffect(() => {
+    const handleBlockUpdate = (message: any) => {
+      const { data } = message;
+      
+      if (data.deleted) {
+        setBlocks(prevBlocks => prevBlocks.filter(block => block.id !== data.id));
+        if (selectedBlockId === data.id) {
+          setSelectedBlockId(null);
+          setIsDrawerOpen(false);
+        }
+        return;
+      }
+      
+      setBlocks(prevBlocks => 
+        prevBlocks.map(block => 
+          block.id === data.id 
+            ? { ...block, ...data }
+            : block
+        )
+      );
+    };
+    
+    const handleBlockEditing = (message: any) => {
+      const { data } = message;
+      
+      setBlocks(prevBlocks => 
+        prevBlocks.map(block => 
+          block.id === data.blockId 
+            ? { ...block, editingUserId: data.userId }
+            : block
+        )
+      );
+    };
+    
+    const handleBlockEditingEnd = (message: any) => {
+      const { data } = message;
+      
+      setBlocks(prevBlocks => 
+        prevBlocks.map(block => 
+          block.id === data.blockId 
+            ? { ...block, editingUserId: null }
+            : block
+        )
+      );
+    };
+    
+    const handleRollback = (timestamp: number) => {
+      console.log(`Rolling back state to ${new Date(timestamp).toISOString()}`);
+      // In a real implementation, we would restore the state from a saved snapshot
+      // For this demo, we'll just show a toast
+      toast({
+        title: "State Rollback",
+        description: "Collaborative state has been synchronized.",
+      });
+    };
+    
+    webSocketService.on('blockUpdate', handleBlockUpdate);
+    webSocketService.on('blockEditing', handleBlockEditing);
+    webSocketService.on('blockEditingEnd', handleBlockEditingEnd);
+    webSocketService.on('rollback', handleRollback);
+    
+    return () => {
+      webSocketService.off('blockUpdate', handleBlockUpdate);
+      webSocketService.off('blockEditing', handleBlockEditing);
+      webSocketService.off('blockEditingEnd', handleBlockEditingEnd);
+      webSocketService.off('rollback', handleRollback);
+    };
+  }, [selectedBlockId]);
+  
+  // Close drawer and end editing on component unmount
+  useEffect(() => {
+    return () => {
+      if (selectedBlockId) {
+        webSocketService.endEditingBlock(selectedBlockId);
+      }
+    };
+  }, [selectedBlockId]);
   
   return (
     <div className="flex flex-col h-screen overflow-hidden bg-background text-foreground track-colors-default">
@@ -316,22 +515,28 @@ const Index = () => {
       
       <div className="flex flex-grow overflow-hidden">
         <TrackList 
-          tracks={tracks}
+          ref={trackListRef}
+          tracks={tracksWithLockInfo}
           onVolumeChange={handleTrackVolumeChange}
           onMuteToggle={handleTrackMuteToggle}
           onSoloToggle={handleTrackSoloToggle}
           onRename={() => {}}
           trackHeight={trackHeight}
+          scrollTop={verticalScrollPosition}
+          onTrackListScroll={handleTrackListScroll}
         />
         
         <div className="flex-grow overflow-hidden flex flex-col">
           <Timeline 
+            ref={timelineRef}
             width={containerWidth}
             pixelsPerBeat={pixelsPerBeat}
             beatsPerBar={beatsPerBar}
             totalBars={totalBars}
             currentTime={currentTime}
             totalTime={totalTime}
+            scrollLeft={horizontalScrollPosition}
+            onTimelineScroll={handleTimelineScroll}
           />
           
           <div 
@@ -339,8 +544,12 @@ const Index = () => {
             className="flex-grow relative overflow-auto"
             onClick={handleContainerClick}
             onDoubleClick={handleContainerDoubleClick}
+            onScroll={handleTracksContainerScroll}
           >
-            <div className="absolute inset-0 pointer-events-none">
+            <div 
+              className="absolute inset-0 pointer-events-none"
+              style={{ width: `${totalBars * beatsPerBar * pixelsPerBeat}px` }}
+            >
               {tracks.map((_, index) => (
                 <div 
                   key={index}
@@ -365,12 +574,18 @@ const Index = () => {
                 pixelsPerBeat={pixelsPerBeat}
                 trackHeight={trackHeight}
                 editingUserId={block.editingUserId}
+                isTrackLocked={isTrackLocked(block.track) && block.editingUserId !== webSocketService.getLocalUserId()}
               />
             ))}
             
             <div 
               className="playhead"
-              style={{ left: `${currentBeat * pixelsPerBeat}px` }}
+              style={{ 
+                left: `${(currentBeat * pixelsPerBeat) - horizontalScrollPosition}px`,
+                position: 'fixed',
+                height: '100%',
+                top: tracks.length ? '16rem' : 0 
+              }}
             />
             
             {showCollaborators && remoteUsers.map(user => (
@@ -387,7 +602,13 @@ const Index = () => {
         
         <EditDrawer 
           isOpen={isDrawerOpen}
-          onClose={() => setIsDrawerOpen(false)}
+          onClose={() => {
+            setIsDrawerOpen(false);
+            if (selectedBlockId) {
+              webSocketService.endEditingBlock(selectedBlockId);
+              setSelectedBlockId(null);
+            }
+          }}
           selectedBlock={selectedBlock || null}
           onNameChange={handleBlockNameChange}
           onVolumeChange={handleBlockVolumeChange}

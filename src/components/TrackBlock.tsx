@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect } from 'react';
 import { cn } from '@/lib/utils';
 
@@ -15,6 +16,7 @@ export interface TrackBlockProps {
   pixelsPerBeat: number;
   trackHeight: number;
   editingUserId?: string | null;
+  isTrackLocked?: boolean;
 }
 
 const TrackBlock: React.FC<TrackBlockProps> = ({
@@ -29,7 +31,8 @@ const TrackBlock: React.FC<TrackBlockProps> = ({
   onLengthChange,
   pixelsPerBeat,
   trackHeight,
-  editingUserId
+  editingUserId,
+  isTrackLocked
 }) => {
   const [isDragging, setIsDragging] = useState(false);
   const [isResizing, setIsResizing] = useState(false);
@@ -47,6 +50,11 @@ const TrackBlock: React.FC<TrackBlockProps> = ({
 
   const handleMouseDown = (e: React.MouseEvent) => {
     e.stopPropagation();
+    
+    if (isTrackLocked) {
+      return;
+    }
+    
     onSelect(id);
     
     if ((e.target as HTMLElement).classList.contains('resize-handle')) {
@@ -67,6 +75,10 @@ const TrackBlock: React.FC<TrackBlockProps> = ({
   };
   
   const handleResizeMouseDown = (e: React.MouseEvent) => {
+    if (isTrackLocked) {
+      return;
+    }
+    
     e.stopPropagation();
     e.preventDefault();
     setIsResizing(true);
@@ -76,7 +88,7 @@ const TrackBlock: React.FC<TrackBlockProps> = ({
   };
   
   const handleMouseMove = (e: MouseEvent) => {
-    if (!isDragging || !blockRef.current) return;
+    if (!isDragging || !blockRef.current || isTrackLocked) return;
     
     const container = blockRef.current.parentElement;
     if (!container) return;
@@ -94,7 +106,7 @@ const TrackBlock: React.FC<TrackBlockProps> = ({
   };
   
   const handleResizeMouseMove = (e: MouseEvent) => {
-    if (!isResizing || !blockRef.current) return;
+    if (!isResizing || !blockRef.current || isTrackLocked) return;
     
     const container = blockRef.current.parentElement;
     if (!container) return;
@@ -145,13 +157,16 @@ const TrackBlock: React.FC<TrackBlockProps> = ({
         "backdrop-blur-sm bg-black/30",
         selected ? "border-primary shadow-lg" : "border-transparent",
         isDragging ? "dragging" : "",
-        editingUserId && !selected ? "ring-2 ring-offset-1" : ""
+        editingUserId && !selected ? `ring-2 ring-offset-1` : "",
+        isTrackLocked ? "opacity-70 cursor-not-allowed" : ""
       )}
       style={blockStyle}
       onMouseDown={handleMouseDown}
       onClick={(e) => {
         e.stopPropagation();
-        onSelect(id);
+        if (!isTrackLocked) {
+          onSelect(id);
+        }
       }}
     >
       <div className="absolute inset-0 opacity-80">
@@ -172,15 +187,25 @@ const TrackBlock: React.FC<TrackBlockProps> = ({
         </div>
       </div>
       
-      {editingUserId && !selected && (
+      {editingUserId && (
         <div 
           className="absolute -top-2 -right-2 w-4 h-4 rounded-full z-30"
           style={{ backgroundColor: getEditorColor() }}
         />
       )}
       
+      {editingUserId && !selected && (
+        <div 
+          className="absolute inset-0 ring-2 pointer-events-none"
+          style={{ 
+            borderColor: getEditorColor(),
+            borderWidth: 2
+          }}
+        />
+      )}
+      
       <div 
-        className="resize-handle absolute right-0 top-0 bottom-0 w-2 cursor-col-resize"
+        className={`resize-handle absolute right-0 top-0 bottom-0 w-2 ${isTrackLocked ? 'cursor-not-allowed' : 'cursor-col-resize'}`}
         onMouseDown={handleResizeMouseDown}
       />
     </div>

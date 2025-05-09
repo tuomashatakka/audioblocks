@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { forwardRef } from 'react';
 
 interface TimelineProps {
   width: number;
@@ -8,16 +8,20 @@ interface TimelineProps {
   totalBars: number;
   currentTime: string;
   totalTime: string;
+  onTimelineScroll?: (scrollLeft: number) => void;
+  scrollLeft?: number;
 }
 
-const Timeline: React.FC<TimelineProps> = ({
+const Timeline = forwardRef<HTMLDivElement, TimelineProps>(({
   width,
   pixelsPerBeat,
   beatsPerBar,
   totalBars,
   currentTime,
-  totalTime
-}) => {
+  totalTime,
+  onTimelineScroll,
+  scrollLeft
+}, ref) => {
   const totalBeats = totalBars * beatsPerBar;
   const markers = [];
   
@@ -43,6 +47,12 @@ const Timeline: React.FC<TimelineProps> = ({
     );
   }
   
+  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    if (onTimelineScroll) {
+      onTimelineScroll(e.currentTarget.scrollLeft);
+    }
+  };
+  
   return (
     <div className="relative h-16 border-b border-border bg-secondary/50">
       <div className="absolute top-0 left-4 flex items-center h-full">
@@ -51,11 +61,20 @@ const Timeline: React.FC<TimelineProps> = ({
           <span className="text-sm text-muted-foreground ml-2">/ {totalTime}</span>
         </div>
       </div>
-      <div className="h-full relative mt-8">
-        {markers}
+      <div 
+        ref={ref}
+        className="h-full relative mt-8 overflow-x-auto"
+        style={{ scrollLeft: scrollLeft }}
+        onScroll={handleScroll}
+      >
+        <div className="h-full relative" style={{ width: `${totalBeats * pixelsPerBeat}px` }}>
+          {markers}
+        </div>
       </div>
     </div>
   );
-};
+});
+
+Timeline.displayName = 'Timeline';
 
 export default Timeline;

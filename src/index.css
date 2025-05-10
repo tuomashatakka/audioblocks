@@ -1,41 +1,17 @@
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 240 10% 3.9%;
-    --card: 0 0% 100%;
-    --card-foreground: 240 10% 3.9%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 240 10% 3.9%;
-    --primary: 240 5.9% 10%;
-    --primary-foreground: 0 0% 98%;
-    --secondary: 240 4.8% 95.9%;
-    --secondary-foreground: 240 5.9% 10%;
-    --muted: 240 4.8% 95.9%;
-    --muted-foreground: 240 3.8% 46.1%;
-    --accent: 240 4.8% 95.9%;
-    --accent-foreground: 240 5.9% 10%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 240 5.9% 90%;
-    --input: 240 5.9% 90%;
-    --ring: 240 5.9% 10%;
-    --radius: 0.5rem;
-  }
- 
-  .dark {
     --background: 240 10% 3.9%;
     --foreground: 0 0% 98%;
     --card: 240 10% 3.9%;
     --card-foreground: 0 0% 98%;
     --popover: 240 10% 3.9%;
     --popover-foreground: 0 0% 98%;
-    --primary: 0 0% 98%;
-    --primary-foreground: 240 5.9% 10%;
+    --primary: 346 77.8% 49.2%;
+    --primary-foreground: 355 100% 97.3%;
     --secondary: 240 3.7% 15.9%;
     --secondary-foreground: 0 0% 98%;
     --muted: 240 3.7% 15.9%;
@@ -47,6 +23,7 @@
     --border: 240 3.7% 15.9%;
     --input: 240 3.7% 15.9%;
     --ring: 240 4.9% 83.9%;
+    --radius: 0.5rem;
   }
 }
 
@@ -62,6 +39,7 @@
 /* Timeline styles */
 .timeline-container {
   @apply bg-muted/50 border-b border-border relative;
+  backdrop-filter: blur(8px);
 }
 
 .timeline-beats {
@@ -76,6 +54,7 @@
 
 .timeline-bar.bar-start {
   @apply bg-border/80 w-[2px];
+  box-shadow: 0 0 15px var(--primary);
 }
 
 .timeline-beat {
@@ -84,7 +63,8 @@
 }
 
 .timeline-playhead {
-  @apply absolute top-0 h-full w-px bg-red-500;
+  @apply absolute top-0 h-full w-px bg-primary;
+  box-shadow: 0 0 20px var(--primary);
   z-index: 10;
 }
 
@@ -92,6 +72,11 @@
 .timeline-marker-item {
   @apply absolute top-0 flex flex-col items-center cursor-pointer;
   z-index: 20;
+  transition: transform 0.2s ease;
+}
+
+.timeline-marker-item:hover {
+  transform: scale(1.1);
 }
 
 .timeline-marker-line {
@@ -100,29 +85,42 @@
 
 .timeline-marker-icon {
   @apply absolute top-1 -translate-x-1/2 bg-background border border-current rounded-full p-1;
+  transition: all 0.2s ease;
+  box-shadow: 0 0 10px currentColor;
 }
 
 .timeline-marker-label {
   @apply absolute bottom-1 -translate-x-1/2 bg-background text-foreground text-xs px-1 rounded;
   white-space: nowrap;
+  backdrop-filter: blur(4px);
 }
 
 /* TrackBlock styles */
 .track-block {
-  @apply transition-colors;
+  @apply transition-all duration-200;
   z-index: 10;
+  backdrop-filter: blur(4px);
+  box-shadow: 0 2px 15px rgba(0, 0, 0, 0.2);
+}
+
+.track-block:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
 }
 
 .track-block.dragging {
   @apply opacity-70;
+  transform: scale(1.02);
 }
 
 .track-block .waveform {
   @apply bg-primary/60 rounded-sm mx-px;
+  transition: height 0.3s ease;
 }
 
 .playhead {
-  @apply w-px bg-red-500;
+  @apply w-px bg-primary;
+  box-shadow: 0 0 20px var(--primary);
   z-index: 100;
   pointer-events: none;
 }
@@ -130,11 +128,19 @@
 /* Tools menu */
 .tool-active {
   @apply bg-accent text-accent-foreground;
+  box-shadow: 0 0 15px var(--primary);
 }
 
 /* Track colors */
 .track-colors-default .waveform {
   @apply bg-primary/60;
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0% { opacity: 0.6; }
+  50% { opacity: 0.8; }
+  100% { opacity: 0.6; }
 }
 
 .track-edited-by-user {
@@ -143,6 +149,76 @@
 
 /* Clip Edit Popup */
 .clip-edit-popup {
-  @apply absolute z-50 bg-popover border border-border rounded-md shadow-md p-3;
+  @apply absolute z-50 bg-popover/90 border border-border rounded-md shadow-xl p-3;
   min-width: 200px;
+  backdrop-filter: blur(10px);
+  animation: slideIn 0.2s ease-out;
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Background gradient animation */
+.bg-gradient-animate {
+  background: linear-gradient(
+    45deg,
+    rgba(255, 70, 106, 0.05),
+    rgba(96, 165, 250, 0.05),
+    rgba(100, 200, 80, 0.05)
+  );
+  background-size: 400% 400%;
+  animation: gradientBG 15s ease infinite;
+}
+
+@keyframes gradientBG {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+/* Button hover effects */
+button {
+  transition: all 0.2s ease;
+}
+
+button:hover {
+  transform: translateY(-1px);
+}
+
+button:active {
+  transform: translateY(0px);
+}
+
+/* Track list enhancements */
+.track-item {
+  transition: all 0.2s ease;
+}
+
+.track-item:hover {
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+/* Slider enhancements */
+.slider-thumb {
+  @apply bg-primary rounded-full;
+  box-shadow: 0 0 10px var(--primary);
+  transition: transform 0.2s ease;
+}
+
+.slider-thumb:hover {
+  transform: scale(1.2);
+}
+
+/* Remote cursor effects */
+.remote-cursor {
+  filter: drop-shadow(0 0 5px currentColor);
+  transition: all 0.3s ease;
 }

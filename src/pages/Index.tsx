@@ -67,7 +67,7 @@ const Index = () => {
   const [clipPopupPosition, setClipPopupPosition] = useState({ x: 0, y: 0 });
   const [activeTool, setActiveTool] = useState<ToolType>('select');
   
-  const tracksContainerRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
   const timelineRef = useRef<HTMLDivElement>(null);
   const trackListRef = useRef<HTMLDivElement>(null);
   const [containerWidth, setContainerWidth] = useState(0);
@@ -83,7 +83,6 @@ const Index = () => {
     theme: 'dark' as const,
   });
   
-  // Convert state data to component props format
   const [tracks, setTracks] = useState<TrackInfo[]>([
     { id: 'track1', name: 'Drums', color: '#FF466A', volume: 80, muted: false, solo: false, armed: false },
     { id: 'track2', name: 'Bass', color: '#FFB446', volume: 75, muted: false, solo: false, armed: false },
@@ -98,50 +97,60 @@ const Index = () => {
     { id: 'block4', name: 'Synth Lead', track: 2, startBeat: 12, lengthBeats: 6, volume: 65, pitch: 0 },
     { id: 'block5', name: 'Vocal Chop', track: 3, startBeat: 16, lengthBeats: 8, volume: 85, pitch: 2 },
   ]);
-  
-  const handleSelectBlock = (id: string) => {
-    // Check if the block is being edited by someone else
-    // const block = blocks.find(block => block.id === id);
-    // if (block?.editingUserId && block.editingUserId !== webSocketService.getLocalUserId()) {
-    //   toast({
-    //     title: "Block is being edited",
-    //     description: `This clip is currently being edited by another user.`,
-    //     variant: "destructive",
-    //   });
-    //   return;
-    // }
-    
-    // // End editing previous block
-    // if (selectedBlockId) {
-    //   webSocketService.endEditingBlock(selectedBlockId);
-    // }
-    
-    // // Position the edit popup
-    // if (tracksContainerRef.current && block) {
-    //   const blockX = block.startBeat * pixelsPerBeat;
-    //   const blockY = block.track * trackHeight;
-      
-    //   setClipPopupPosition({
-    //     x: blockX - horizontalScrollPosition,
-    //     y: blockY - verticalScrollPosition + trackHeight
-    //   });
-    // }
-    
-    setSelectedBlockId(id);
-    
-    // // Start editing new block
-    // webSocketService.startEditingBlock(id);
+
+  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    const { scrollLeft, scrollTop } = e.currentTarget;
+    setHorizontalScrollPosition(scrollLeft);
+    setVerticalScrollPosition(scrollTop);
+
+    if (timelineRef.current) {
+      timelineRef.current.scrollLeft = scrollLeft;
+    }
+    if (trackListRef.current) {
+      trackListRef.current.scrollTop = scrollTop;
+    }
   };
-  
-  const selectedBlock = blocks.find(block => block.id === selectedBlockId);
-  
-  // Check if a track is locked (has a block being edited by someone else)
+
   const isTrackLocked = (trackIndex: number): boolean => {
-    return false;
+    return blocks.some(block => 
+      block.track === trackIndex && 
+      block.editingUserId && 
+      block.editingUserId !== state.localUserId
+    );
   };
-  
+
+  const handleSelectBlock = (id: string) => {
+    const block = blocks.find(block => block.id === id);
+    if (!block) return;
+
+    if (block.editingUserId && block.editingUserId !== state.localUserId) {
+      toast({
+        title: "Block is being edited",
+        description: `This clip is currently being edited by another user.`,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (selectedBlockId) {
+      sendMessage(ActionType.END_EDITING_BLOCK, { blockId: selectedBlockId });
+    }
+
+    sendMessage(ActionType.START_EDITING_BLOCK, { blockId: id });
+    setSelectedBlockId(id);
+
+    if (scrollContainerRef.current && block) {
+      const blockX = block.startBeat * pixelsPerBeat;
+      const blockY = block.track * trackHeight;
+      
+      setClipPopupPosition({
+        x: blockX - horizontalScrollPosition,
+        y: blockY - verticalScrollPosition + trackHeight
+      });
+    }
+  };
+
   const handleBlockPositionChange = (id: string, newTrack: number, newStartBeat: number) => {
-    // Check if the target track is locked
     if (isTrackLocked(newTrack)) {
       toast({
         title: "Track Locked",
@@ -151,7 +160,6 @@ const Index = () => {
       return;
     }
 
-    // Apply grid snapping if enabled
     let adjustedStartBeat = newStartBeat;
     if (settings.snapToGrid) {
       adjustedStartBeat = Math.round(newStartBeat / settings.gridSize) * settings.gridSize;
@@ -165,16 +173,14 @@ const Index = () => {
       )
     );
     
-    // Send update via WebSocket
     sendMessage(ActionType.MOVE_BLOCK, { 
       blockId: id, 
       trackId: newTrack,
       startBeat: adjustedStartBeat 
     });
   };
-  
+
   const handleBlockLengthChange = (id: string, newLength: number) => {
-    // Apply grid snapping if enabled
     let adjustedLength = newLength;
     if (settings.snapToGrid) {
       adjustedLength = Math.max(settings.gridSize, 
@@ -189,13 +195,12 @@ const Index = () => {
       )
     );
     
-    // Send update via WebSocket
     sendMessage(ActionType.RESIZE_BLOCK, { 
       blockId: id, 
       lengthBeats: adjustedLength 
     });
   };
-  
+
   const handlePlay = () => {
     setIsPlaying(true);
     sendMessage(ActionType.PLAY, {});
@@ -204,12 +209,12 @@ const Index = () => {
       description: "Your composition is now playing.",
     });
   };
-  
+
   const handlePause = () => {
     setIsPlaying(false);
     sendMessage(ActionType.PAUSE, {});
   };
-  
+
   const handleRestart = () => {
     setCurrentBeat(0);
     if (!isPlaying) {
@@ -217,7 +222,7 @@ const Index = () => {
     }
     sendMessage(ActionType.RESTART, {});
   };
-  
+
   const handleTrackVolumeChange = (trackId: string, volume: number) => {
     setTracks(prevTracks => 
       prevTracks.map(track => 
@@ -229,7 +234,7 @@ const Index = () => {
     
     sendMessage(ActionType.SET_TRACK_VOLUME, { trackId, volume });
   };
-  
+
   const handleTrackMuteToggle = (trackId: string) => {
     setTracks(prevTracks => {
       const updatedTracks = prevTracks.map(track => 
@@ -246,7 +251,7 @@ const Index = () => {
       return updatedTracks;
     });
   };
-  
+
   const handleTrackSoloToggle = (trackId: string) => {
     setTracks(prevTracks => {
       const updatedTracks = prevTracks.map(track => 
@@ -263,7 +268,7 @@ const Index = () => {
       return updatedTracks;
     });
   };
-  
+
   const handleTrackArmToggle = (trackId: string) => {
     setTracks(prevTracks => {
       const updatedTracks = prevTracks.map(track => 
@@ -280,7 +285,7 @@ const Index = () => {
       return updatedTracks;
     });
   };
-  
+
   const handleAddTrack = () => {
     const newTrackId = `track${tracks.length + 1}`;
     const colors = ['#FF466A', '#FFB446', '#64C850', '#5096FF'];
@@ -297,8 +302,6 @@ const Index = () => {
     };
     
     setTracks([...tracks, newTrack]);
-    
-    // Send via WebSocket
     sendMessage(ActionType.ADD_TRACK, { track: newTrack });
     
     toast({
@@ -306,7 +309,7 @@ const Index = () => {
       description: "A new track has been added to your composition.",
     });
   };
-  
+
   const handleBlockNameChange = (id: string, name: string) => {
     setBlocks(prevBlocks => 
       prevBlocks.map(block => 
@@ -316,10 +319,9 @@ const Index = () => {
       )
     );
     
-    // Send update via WebSocket
     sendMessage(ActionType.UPDATE_BLOCK, { blockId: id, name });
   };
-  
+
   const handleBlockVolumeChange = (id: string, volume: number) => {
     setBlocks(prevBlocks => 
       prevBlocks.map(block => 
@@ -329,10 +331,9 @@ const Index = () => {
       )
     );
     
-    // Send update via WebSocket
     sendMessage(ActionType.UPDATE_BLOCK, { blockId: id, volume });
   };
-  
+
   const handleBlockPitchChange = (id: string, pitch: number) => {
     setBlocks(prevBlocks => 
       prevBlocks.map(block => 
@@ -342,15 +343,13 @@ const Index = () => {
       )
     );
     
-    // Send update via WebSocket
     sendMessage(ActionType.UPDATE_BLOCK, { blockId: id, pitch });
   };
-  
+
   const handleDeleteBlock = (id: string) => {
     setBlocks(prevBlocks => prevBlocks.filter(block => block.id !== id));
     setSelectedBlockId(null);
     
-    // Send update via WebSocket
     sendMessage(ActionType.REMOVE_BLOCK, { blockId: id });
     
     toast({
@@ -359,40 +358,10 @@ const Index = () => {
       variant: "destructive",
     });
   };
-  
-  const handleAddMarker = (marker: any) => {
-    // const newMarker = {
-    //   id: `marker${Date.now()}`,
-    //   ...marker
-    // };
-    
-    // setMarkers([...markers, newMarker]);
-    
-    // toast({
-    //   title: "Marker Added",
-    //   description: `Marker "${marker.label || 'New marker'}" has been added to the timeline.`,
-    // });
-  };
-  
-  const handleEditMarker = (id: string, changes: any) => {
-    // setMarkers(prevMarkers => 
-    //   prevMarkers.map(marker => 
-    //     marker.id === id 
-    //       ? { ...marker, ...changes } 
-    //       : marker
-    //   )
-    // );
-  };
-  
-  const handleDeleteMarker = (id: string) => {
-    // setMarkers(prevMarkers => prevMarkers.filter(marker => marker.id !== id));
-    
-    // toast({
-    //   title: "Marker Deleted",
-    //   description: "The timeline marker has been removed.",
-    //   variant: "destructive",
-    // });
-  };
+
+  const handleAddMarker = (marker: any) => {};
+  const handleEditMarker = (id: string, changes: any) => {};
+  const handleDeleteMarker = (id: string) => {};
 
   const handleSettingsChange = (key: string, value: any) => {
     setSettings(prev => ({
@@ -400,12 +369,11 @@ const Index = () => {
       [key]: value
     }));
     
-    // Apply specific setting changes
     if (key === 'showCollaborators') {
       setShowCollaborators(value);
     }
   };
-  
+
   const formatTime = (beats: number): string => {
     const seconds = (beats * 60) / bpm;
     const minutes = Math.floor(seconds / 60);
@@ -430,26 +398,14 @@ const Index = () => {
     
     return () => clearInterval(interval);
   }, [isPlaying, bpm, beatsPerBar, totalBars]);
-  
-  const handleTracksContainerScroll = (e: React.UIEvent<HTMLDivElement>) => {
-    const { scrollLeft, scrollTop } = e.currentTarget;
-    setHorizontalScrollPosition(scrollLeft);
-    setVerticalScrollPosition(scrollTop);
-  };
-  
-  const handleTimelineScroll = (scrollLeft: number) => {
-    setHorizontalScrollPosition(scrollLeft);
-    if (tracksContainerRef.current) {
-      tracksContainerRef.current.scrollLeft = scrollLeft;
+
+  const handleContainerClick = (e: React.MouseEvent) => {
+    if (e.currentTarget === e.target) {
+      setSelectedBlockId(null);
     }
   };
-  
-  const handleTrackListScroll = (scrollTop: number) => {
-    setVerticalScrollPosition(scrollTop);
-    if (tracksContainerRef.current) {
-      tracksContainerRef.current.scrollTop = scrollTop;
-    }
-  };
+
+  const handleContainerDoubleClick = (e: React.MouseEvent) => {};
 
   const handleSeek = (beat: number) => {
     setCurrentBeat(beat);
@@ -462,86 +418,21 @@ const Index = () => {
   const handleZoomOut = () => {
     setPixelsPerBeat(prev => Math.max(prev - 10, 20));
   };
-  
-  const handleContainerClick = (e: React.MouseEvent) => {
-    if (e.currentTarget === e.target) {
-      setSelectedBlockId(null);
-    }
-  };
-  
-  const handleContainerDoubleClick = (e: React.MouseEvent) => {
-    // if (e.currentTarget !== e.target || activeTool !== 'select') return;
-    
-    // const containerRect = tracksContainerRef.current?.getBoundingClientRect();
-    // if (!containerRect) return;
-    
-    // const x = e.clientX - containerRect.left + horizontalScrollPosition;
-    // const y = e.clientY - containerRect.top + verticalScrollPosition;
-    
-    // const track = Math.floor(y / trackHeight);
-    // let startBeat = Math.floor(x / pixelsPerBeat);
-    
-    // // Apply grid snapping
-    // if (settings.snapToGrid) {
-    //   startBeat = Math.round(startBeat / settings.gridSize) * settings.gridSize;
-    // }
-    
-    // // Check if the track is locked
-    // if (isTrackLocked(track)) {
-    //   toast({
-    //     title: "Track Locked",
-    //     description: "This track has clips being edited by other users.",
-    //     variant: "destructive",
-    //   });
-    //   return;
-    // }
-    
-    // if (track >= 0 && track < tracks.length) {
-    //   const newBlock: Block = {
-    //     id: `block${Date.now()}`,
-    //     name: 'New Clip',
-    //     track,
-    //     startBeat,
-    //     lengthBeats: settings.snapToGrid ? settings.gridSize * 4 : 4,
-    //     volume: 75,
-    //     pitch: 0
-    //   };
-      
-    //   setBlocks([...blocks, newBlock]);
-      
-    //   // Position popup for the new block
-    //   setClipPopupPosition({
-    //     x: (startBeat * pixelsPerBeat) - horizontalScrollPosition,
-    //     y: (track * trackHeight) - verticalScrollPosition + trackHeight
-    //   });
-      
-    //   setSelectedBlockId(newBlock.id);
-      
-    //   // Start editing new block
-    //   webSocketService.startEditingBlock(newBlock.id);
-      
-    //   // Send update via WebSocket
-    //   webSocketService.sendMessage('blockUpdate', newBlock);
-      
-    //   toast({
-    //     title: "Clip Added",
-    //     description: "A new audio clip has been added to your track.",
-    //   });
-    // }
-  };
-  
-  // Update track locked status and add user color highlighting for edited tracks
+
   const getTrackEditingUserId = (trackIndex: number) => {
-    // const editingBlocks = blocks.filter(
-    //   block => block.track === trackIndex && 
-    //            block.editingUserId && 
-    //            block.editingUserId !== webSocketService.getLocalUserId()
-    // );
-    
-    // return editingBlocks.length > 0 ? editingBlocks[0].editingUserId : null;
-    return null;
+    return blocks.find(
+      block => block.track === trackIndex && 
+               block.editingUserId && 
+               block.editingUserId !== state.localUserId
+    )?.editingUserId || null;
   };
-  
+
+  const getUserColor = (userId: string | null | undefined): string => {
+    if (!userId) return '';
+    const user = remoteUsers.find(u => u.id === userId);
+    return user ? user.color : '#888888';
+  };
+
   const tracksWithLockInfo = tracks.map((track, index) => {
     const editingUserId = getTrackEditingUserId(index);
     return {
@@ -551,92 +442,8 @@ const Index = () => {
     };
   });
 
-  // Get the user color of who is editing a track
-  const getUserColor = (userId: string | null | undefined): string => {
-    if (!userId) return '';
-    
-    const user = remoteUsers.find(u => u.id === userId);
-    return user ? user.color : '#888888';
-  };
-  
-  // Setup WebSocket listeners
-  useEffect(() => {
-    // const handleBlockUpdate = (message: any) => {
-    //   const { data } = message;
-      
-    //   if (data.deleted) {
-    //     setBlocks(prevBlocks => prevBlocks.filter(block => block.id !== data.id));
-    //     if (selectedBlockId === data.id) {
-    //       setSelectedBlockId(null);
-    //     }
-    //     return;
-    //   }
-      
-    //   setBlocks(prevBlocks => 
-    //     prevBlocks.map(block => 
-    //       block.id === data.id 
-    //         ? { ...block, ...data }
-    //         : block
-    //     )
-    //   );
-    // };
-    
-    // const handleBlockEditing = (message: any) => {
-    //   const { data } = message;
-      
-    //   setBlocks(prevBlocks => 
-    //     prevBlocks.map(block => 
-    //       block.id === data.blockId 
-    //         ? { ...block, editingUserId: data.userId }
-    //         : block
-    //     )
-    //   );
-    // };
-    
-    // const handleBlockEditingEnd = (message: any) => {
-    //   const { data } = message;
-      
-    //   setBlocks(prevBlocks => 
-    //     prevBlocks.map(block => 
-    //       block.id === data.blockId 
-    //         ? { ...block, editingUserId: null }
-    //         : block
-    //     )
-    //   );
-    // };
-    
-    // const handleRollback = (timestamp: number) => {
-    //   console.log(`Rolling back state to ${new Date(timestamp).toISOString()}`);
-    //   // In a real implementation, we would restore the state from a saved snapshot
-    //   // For this demo, we'll just show a toast
-    //   toast({
-    //     title: "State Rollback",
-    //     description: "Collaborative state has been synchronized.",
-    //   });
-    // };
-    
-    // webSocketService.on('blockUpdate', handleBlockUpdate);
-    // webSocketService.on('blockEditing', handleBlockEditing);
-    // webSocketService.on('blockEditingEnd', handleBlockEditingEnd);
-    // webSocketService.on('rollback', handleRollback);
-    
-    // return () => {
-    //   webSocketService.off('blockUpdate', handleBlockUpdate);
-    //   webSocketService.off('blockEditing', handleBlockEditing);
-    //   webSocketService.off('blockEditingEnd', handleBlockEditingEnd);
-    //   webSocketService.off('rollback', handleRollback);
-    // };
-  }, [selectedBlockId]);
-  
-  // Close drawer and end editing on component unmount
-  useEffect(() => {
-    return () => {
-      // if (selectedBlockId) {
-      //   webSocketService.endEditingBlock(selectedBlockId);
-      // }
-    };
-  }, [selectedBlockId]);
-  
+  const selectedBlock = blocks.find(block => block.id === selectedBlockId);
+
   return (
     <div className="flex flex-col h-screen overflow-hidden bg-background text-foreground track-colors-default">
       <div className="absolute inset-0 pointer-events-none bg-gradient-to-br from-blue-500/5 via-purple-500/5 to-pink-500/5 mix-blend-screen z-0" />
@@ -667,7 +474,6 @@ const Index = () => {
             variant="ghost" 
             size="sm" 
             onClick={() => setHistoryVisible(!historyVisible)}
-            className="flex items-center"
           >
             <History size={16} className="mr-1" />
             History
@@ -677,7 +483,6 @@ const Index = () => {
             variant="ghost" 
             size="sm" 
             onClick={() => setIsSettingsOpen(true)}
-            className="flex items-center"
           >
             <Settings size={16} className="mr-1" />
             Settings
@@ -696,7 +501,6 @@ const Index = () => {
           onRename={() => {}}
           trackHeight={trackHeight}
           scrollTop={verticalScrollPosition}
-          onTrackListScroll={handleTrackListScroll}
         />
         
         <div className="flex-grow overflow-hidden flex flex-col">
@@ -714,26 +518,28 @@ const Index = () => {
             onDeleteMarker={handleDeleteMarker}
             onSeek={handleSeek}
             scrollLeft={horizontalScrollPosition}
-            onTimelineScroll={handleTimelineScroll}
           />
           
           <div 
-            ref={tracksContainerRef}
+            ref={scrollContainerRef}
             className="flex-grow relative overflow-auto"
             onClick={handleContainerClick}
             onDoubleClick={handleContainerDoubleClick}
-            onScroll={handleTracksContainerScroll}
+            onScroll={handleScroll}
           >
             <div 
-              className="absolute inset-0 pointer-events-none"
-              style={{ width: `${totalBars * beatsPerBar * pixelsPerBeat}px` }}
+              className="absolute inset-0"
+              style={{ 
+                width: `${totalBars * beatsPerBar * pixelsPerBeat}px`,
+                minHeight: `${tracks.length * trackHeight}px`
+              }}
             >
               {tracks.map((_, index) => {
                 const editingUserId = getTrackEditingUserId(index);
                 const userColor = getUserColor(editingUserId);
                 
                 return (
-                  <div key={index} className="track-edited-by-user">
+                  <div key={index} className="track-edited-by-user absolute left-0 right-0">
                     <div 
                       className="absolute left-0 right-0 border-b border-border"
                       style={{ 
@@ -756,67 +562,37 @@ const Index = () => {
                   </div>
                 );
               })}
-            </div>
-            
-            {blocks.map(block => (
-              <TrackBlock 
-                key={block.id}
-                id={block.id}
-                track={block.track}
-                startBeat={block.startBeat}
-                lengthBeats={block.lengthBeats}
-                name={block.name}
-                selected={block.id === selectedBlockId}
-                onSelect={handleSelectBlock}
-                onPositionChange={handleBlockPositionChange}
-                onLengthChange={handleBlockLengthChange}
-                pixelsPerBeat={pixelsPerBeat}
-                trackHeight={trackHeight}
-                editingUserId={block.editingUserId}
-                isTrackLocked={isTrackLocked(block.track) && block.editingUserId !== null}
-                activeTool={activeTool}
-              />
-            ))}
-            
-            <div 
-              className="playhead"
-              style={{ 
-                left: `${(currentBeat * pixelsPerBeat) - horizontalScrollPosition}px`,
-                position: 'fixed',
-                height: '100%',
-                top: tracks.length ? '16rem' : 0 
-              }}
-            />
-            
-            {showCollaborators && remoteUsers.map(user => (
-              <RemoteUser 
-                key={user.id}
-                id={user.id}
-                name={user.name}
-                position={user.position}
-                color={user.color}
-              />
-            ))}
-            
-            {selectedBlockId && selectedBlock && (
-              <ClipEditPopup
-                blockId={selectedBlockId}
-                name={selectedBlock.name}
-                volume={selectedBlock.volume}
-                pitch={selectedBlock.pitch}
-                position={clipPopupPosition}
-                onNameChange={handleBlockNameChange}
-                onVolumeChange={handleBlockVolumeChange}
-                onPitchChange={handleBlockPitchChange}
-                onDelete={handleDeleteBlock}
-                onClose={() => {
-                  setSelectedBlockId(null);
-                  // if (selectedBlockId) {
-                  //   webSocketService.endEditingBlock(selectedBlockId);
-                  // }
+
+              {blocks.map(block => (
+                <TrackBlock 
+                  key={block.id}
+                  id={block.id}
+                  track={block.track}
+                  startBeat={block.startBeat}
+                  lengthBeats={block.lengthBeats}
+                  name={block.name}
+                  selected={block.id === selectedBlockId}
+                  onSelect={handleSelectBlock}
+                  onPositionChange={handleBlockPositionChange}
+                  onLengthChange={handleBlockLengthChange}
+                  pixelsPerBeat={pixelsPerBeat}
+                  trackHeight={trackHeight}
+                  editingUserId={block.editingUserId}
+                  isTrackLocked={isTrackLocked(block.track)}
+                  activeTool={activeTool}
+                />
+              ))}
+
+              <div 
+                className="playhead"
+                style={{ 
+                  left: `${currentBeat * pixelsPerBeat}px`,
+                  height: '100%',
+                  position: 'absolute',
+                  top: 0
                 }}
               />
-            )}
+            </div>
           </div>
         </div>
       </div>
@@ -832,6 +608,26 @@ const Index = () => {
         settings={settings}
         onSettingsChange={handleSettingsChange}
       />
+
+      {selectedBlockId && selectedBlock && (
+        <ClipEditPopup
+          blockId={selectedBlockId}
+          name={selectedBlock.name}
+          volume={selectedBlock.volume}
+          pitch={selectedBlock.pitch}
+          position={clipPopupPosition}
+          onNameChange={handleBlockNameChange}
+          onVolumeChange={handleBlockVolumeChange}
+          onPitchChange={handleBlockPitchChange}
+          onDelete={handleDeleteBlock}
+          onClose={() => {
+            if (selectedBlockId) {
+              sendMessage(ActionType.END_EDITING_BLOCK, { blockId: selectedBlockId });
+            }
+            setSelectedBlockId(null);
+          }}
+        />
+      )}
     </div>
   );
 };

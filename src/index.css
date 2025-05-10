@@ -5,231 +5,144 @@
 
 @layer base {
   :root {
-    --background: 220 10% 8%;
-    --foreground: 210 40% 98%;
-    
-    --card: 220 10% 10%;
-    --card-foreground: 210 40% 98%;
-    
-    --popover: 220 10% 8%;
-    --popover-foreground: 210 40% 98%;
-    
-    --primary: 262 80% 65%;
-    --primary-foreground: 210 40% 98%;
-    
-    --secondary: 220 8% 15%;
-    --secondary-foreground: 210 40% 98%;
-    
-    --muted: 220 8% 20%;
-    --muted-foreground: 220 10% 60%;
-    
-    --accent: 220 8% 20%;
-    --accent-foreground: 210 40% 98%;
-    
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-    
-    --border: 220 8% 20%;
-    --input: 220 8% 20%;
-    --ring: 220 10% 60%;
-    
+    --background: 0 0% 100%;
+    --foreground: 240 10% 3.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 240 10% 3.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 240 10% 3.9%;
+    --primary: 240 5.9% 10%;
+    --primary-foreground: 0 0% 98%;
+    --secondary: 240 4.8% 95.9%;
+    --secondary-foreground: 240 5.9% 10%;
+    --muted: 240 4.8% 95.9%;
+    --muted-foreground: 240 3.8% 46.1%;
+    --accent: 240 4.8% 95.9%;
+    --accent-foreground: 240 5.9% 10%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 240 5.9% 90%;
+    --input: 240 5.9% 90%;
+    --ring: 240 5.9% 10%;
     --radius: 0.5rem;
   }
+ 
+  .dark {
+    --background: 240 10% 3.9%;
+    --foreground: 0 0% 98%;
+    --card: 240 10% 3.9%;
+    --card-foreground: 0 0% 98%;
+    --popover: 240 10% 3.9%;
+    --popover-foreground: 0 0% 98%;
+    --primary: 0 0% 98%;
+    --primary-foreground: 240 5.9% 10%;
+    --secondary: 240 3.7% 15.9%;
+    --secondary-foreground: 0 0% 98%;
+    --muted: 240 3.7% 15.9%;
+    --muted-foreground: 240 5% 64.9%;
+    --accent: 240 3.7% 15.9%;
+    --accent-foreground: 0 0% 98%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 240 3.7% 15.9%;
+    --input: 240 3.7% 15.9%;
+    --ring: 240 4.9% 83.9%;
+  }
+}
 
+@layer base {
   * {
     @apply border-border;
   }
   body {
-    @apply bg-background text-foreground antialiased;
+    @apply bg-background text-foreground;
   }
 }
 
-/* Global gradient overlay */
-body::after {
-  content: '';
-  position: fixed;
-  inset: 0;
-  background: linear-gradient(135deg, rgba(242,245,139,0.05) 0%, rgba(148,197,20,0.05) 30%, rgba(223,234,247,0.05) 70%, rgba(244,248,252,0.05) 100%);
-  mix-blend-mode: screen;
+/* Timeline styles */
+.timeline-container {
+  @apply bg-muted/50 border-b border-border relative;
+}
+
+.timeline-beats {
+  @apply absolute top-0 left-0 h-full;
   pointer-events: none;
-  z-index: 1000;
 }
 
-.track-block {
-  transition: border-color 0.2s ease-in-out, box-shadow 0.2s ease-in-out, transform 0.05s ease-in-out;
+.timeline-bar {
+  @apply absolute top-0 left-0 h-full w-px bg-border;
+  pointer-events: none;
 }
 
-.track-block:hover {
+.timeline-bar.bar-start {
+  @apply bg-border/80 w-[2px];
+}
+
+.timeline-beat {
+  @apply absolute top-0 left-0 h-full w-px bg-border/50;
+  pointer-events: none;
+}
+
+.timeline-playhead {
+  @apply absolute top-0 h-full w-px bg-red-500;
   z-index: 10;
 }
 
-.track-block.selected {
+/* Timeline Markers */
+.timeline-marker-item {
+  @apply absolute top-0 flex flex-col items-center cursor-pointer;
   z-index: 20;
 }
 
-.track-block.dragging {
-  opacity: 0.8;
-  z-index: 30;
-}
-
-@keyframes pulse-cursor {
-  0%, 100% { opacity: 0.6; }
-  50% { opacity: 1; }
-}
-
-.remote-cursor {
-  position: absolute;
-  pointer-events: none;
-  animation: pulse-cursor 2s infinite;
-  z-index: 100;
-}
-
-.waveform-container {
-  background-color: var(--background);
-  background-image: 
-    linear-gradient(to right, 
-      rgba(255, 255, 255, 0.05) 1px, 
-      transparent 1px
-    ),
-    linear-gradient(
-      to bottom,
-      rgba(255, 255, 255, 0.05) 1px,
-      transparent 1px
-    );
-  background-size: 40px 40px;
-}
-
-.playhead {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  width: 2px;
-  background-color: #fff;
-  z-index: 40;
-  pointer-events: none;
-}
-
-.timeline-marker {
-  position: absolute;
-  top: 0;
-  width: 1px;
-  height: 12px;
-  background-color: rgba(255, 255, 255, 0.2);
-}
-
-.timeline-marker.major {
-  height: 20px;
-  background-color: rgba(255, 255, 255, 0.4);
-}
-
-.track-colors-default {
-  --track-1-color: rgba(255, 70, 130, 0.5);
-  --track-2-color: rgba(255, 180, 70, 0.5);
-  --track-3-color: rgba(100, 200, 80, 0.5);
-  --track-4-color: rgba(80, 150, 255, 0.5);
-}
-
-.drawer-transition {
-  transition: transform 0.3s ease-out;
-}
-
-.waveform {
-  background: linear-gradient(180deg, 
-    rgba(146, 151, 179, 0.1) 0%,
-    rgba(120, 160, 180, 0.15) 50%,
-    rgba(90, 140, 180, 0.2) 100%
-  );
-}
-
-.meter-gradient {
-  background: linear-gradient(90deg,
-    #ff2d2d 0%,
-    #ffd700 70%,
-    #00ff00 85%,
-    #00ff00 100%
-  );
-}
-
-.track-edited-by-user {
-  position: relative;
-}
-
-.track-edited-by-user::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  opacity: 0.15;
-  z-index: 0;
-  pointer-events: none;
-}
-
-.timeline-marker-container {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 100%;
-  pointer-events: none;
-}
-
-.timeline-marker-item {
-  position: absolute;
-  top: 20px;
-  transform: translateX(-50%);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  cursor: pointer;
-  pointer-events: auto;
-}
-
-.timeline-marker-item:hover .timeline-marker-line {
-  height: 100%;
-  opacity: 0.5;
-}
-
 .timeline-marker-line {
-  width: 2px;
-  height: 40px;
-  background-color: currentColor;
-  opacity: 0.3;
-  transition: height 0.2s, opacity 0.2s;
+  @apply w-px h-full bg-current opacity-70;
 }
 
 .timeline-marker-icon {
-  margin-top: -8px;
-  background-color: var(--background);
-  border-radius: 50%;
-  padding: 2px;
+  @apply absolute top-1 -translate-x-1/2 bg-background border border-current rounded-full p-1;
 }
 
 .timeline-marker-label {
-  font-size: 10px;
+  @apply absolute bottom-1 -translate-x-1/2 bg-background text-foreground text-xs px-1 rounded;
   white-space: nowrap;
-  background-color: var(--background);
-  padding: 2px 4px;
-  border-radius: 3px;
-  margin-top: 2px;
-  opacity: 0.8;
 }
 
-.clip-edit-popup {
-  position: absolute;
+/* TrackBlock styles */
+.track-block {
+  @apply transition-colors;
+  z-index: 10;
+}
+
+.track-block.dragging {
+  @apply opacity-70;
+}
+
+.track-block .waveform {
+  @apply bg-primary/60 rounded-sm mx-px;
+}
+
+.playhead {
+  @apply w-px bg-red-500;
   z-index: 100;
-  min-width: 200px;
-  border-radius: var(--radius);
-  background-color: hsl(var(--background));
-  border: 1px solid hsl(var(--border));
-  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
-  animation: scale-in 0.2s ease-out;
+  pointer-events: none;
 }
 
-@keyframes scale-in {
-  from { transform: scale(0.95); opacity: 0; }
-  to { transform: scale(1); opacity: 1; }
-}
-
+/* Tools menu */
 .tool-active {
-  background-color: hsl(var(--accent));
-  color: hsl(var(--accent-foreground));
+  @apply bg-accent text-accent-foreground;
+}
+
+/* Track colors */
+.track-colors-default .waveform {
+  @apply bg-primary/60;
+}
+
+.track-edited-by-user {
+  @apply transition-opacity duration-300;
+}
+
+/* Clip Edit Popup */
+.clip-edit-popup {
+  @apply absolute z-50 bg-popover border border-border rounded-md shadow-md p-3;
+  min-width: 200px;
 }

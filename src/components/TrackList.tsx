@@ -113,7 +113,6 @@ const TrackList = forwardRef<HTMLDivElement, TrackListProps>(({
                     size="sm"
                     className="h-6 w-6 p-0" 
                     aria-label="Record Arm"
-                    variant="default"
                     disabled={track.locked}
                     data-state={track.armed ? "on" : "off"}
                     onClick={() => onArmToggle(track.id)}

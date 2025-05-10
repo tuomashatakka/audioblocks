@@ -1,5 +1,5 @@
 
-import { MarkerIcon } from "@/components/TimelineMarker";
+import type { MarkerIcon } from "@/components/TimelineMarker";
 
 export enum ActionType {
   // Project actions

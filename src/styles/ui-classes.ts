@@ -48,6 +48,8 @@ export const ui = {
     movable: "cursor-move",
     waveform: "bg-primary/60 rounded-sm mx-px",
     resizeHandle: "absolute right-0 top-0 bottom-0 w-2 cursor-col-resize",
+    contextMenu: "bg-popover border border-border shadow-md rounded-md p-1 min-w-[160px]",
+    contextMenuItem: "flex items-center px-2 py-1.5 text-sm rounded-sm hover:bg-accent hover:text-accent-foreground cursor-pointer",
   },
   
   // Timeline elements

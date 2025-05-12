@@ -3,6 +3,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { cn } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
 import { ui } from '@/styles/ui-classes';
+import BlockContextMenu from './BlockContextMenu';
 
 export interface TrackBlockProps {
   id: string;
@@ -61,8 +62,7 @@ const TrackBlock: React.FC<TrackBlockProps> = ({
       return;
     }
     
-    onSelect(id);
-    
+    // Do not select when using the resize handle
     if ((e.target as HTMLElement).classList.contains('resize-handle')) {
       return;
     }
@@ -167,15 +167,38 @@ const TrackBlock: React.FC<TrackBlockProps> = ({
   };
 
   const canInteract = activeTool === 'select' && !isTrackLocked;
-  
-  return (
+
+  const handleEdit = () => {
+    onSelect(id);
+  };
+
+  const handleDelete = () => {
+    // This will be handled by the parent component
+    // We just pass the event up
+  };
+
+  const handleDuplicate = () => {
+    toast({
+      title: "Duplicate Block",
+      description: `Duplicated "${name}"`,
+    });
+  };
+
+  const handleSettings = () => {
+    toast({
+      title: "Block Settings",
+      description: `Opened settings for "${name}"`,
+    });
+  };
+
+  const blockContent = (
     <div
       ref={blockRef}
       className={cn(
         ui.trackBlock.base,
         selected ? ui.trackBlock.selected : ui.trackBlock.notSelected,
         isDragging ? ui.trackBlock.dragging : "",
-        editingUserId && !selected ? `ring-2 ring-offset-1` : "",
+        editingUserId && !selected ? "ring-2 ring-offset-1" : "",
         isTrackLocked ? ui.trackBlock.locked : canInteract ? ui.trackBlock.movable : "cursor-default"
       )}
       style={blockStyle}
@@ -227,6 +250,19 @@ const TrackBlock: React.FC<TrackBlockProps> = ({
         onMouseDown={handleResizeMouseDown}
       />
     </div>
+  );
+  
+  return (
+    <BlockContextMenu
+      onEdit={handleEdit}
+      onDelete={() => handleDelete()}
+      onDuplicate={handleDuplicate}
+      onShowSettings={handleSettings}
+      disabled={activeTool !== 'select'}
+      isLocked={isTrackLocked || !!editingUserId && editingUserId !== 'localUser'}
+    >
+      {blockContent}
+    </BlockContextMenu>
   );
 };
 

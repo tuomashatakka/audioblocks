@@ -1,0 +1,426 @@
+export type Json =
+  | string
+  | number
+  | boolean
+  | null
+  | { [key: string]: Json | undefined }
+  | Json[]
+
+export type Database = {
+  public: {
+    Tables: {
+      characters: {
+        Row: {
+          alternate_greetings: string[] | null
+          character_book: Json | null
+          character_version: string | null
+          created_at: string | null
+          creator: string | null
+          creator_notes: string | null
+          description: string
+          extensions: Json | null
+          first_mes: string | null
+          id: string
+          mes_example: string | null
+          name: string
+          personality: string | null
+          post_history_instructions: string | null
+          scenario: string | null
+          spec: string
+          spec_version: string
+          system_prompt: string | null
+          tags: string[] | null
+          updated_at: string | null
+        }
+        Insert: {
+          alternate_greetings?: string[] | null
+          character_book?: Json | null
+          character_version?: string | null
+          created_at?: string | null
+          creator?: string | null
+          creator_notes?: string | null
+          description: string
+          extensions?: Json | null
+          first_mes?: string | null
+          id: string
+          mes_example?: string | null
+          name: string
+          personality?: string | null
+          post_history_instructions?: string | null
+          scenario?: string | null
+          spec?: string
+          spec_version?: string
+          system_prompt?: string | null
+          tags?: string[] | null
+          updated_at?: string | null
+        }
+        Update: {
+          alternate_greetings?: string[] | null
+          character_book?: Json | null
+          character_version?: string | null
+          created_at?: string | null
+          creator?: string | null
+          creator_notes?: string | null
+          description?: string
+          extensions?: Json | null
+          first_mes?: string | null
+          id?: string
+          mes_example?: string | null
+          name?: string
+          personality?: string | null
+          post_history_instructions?: string | null
+          scenario?: string | null
+          spec?: string
+          spec_version?: string
+          system_prompt?: string | null
+          tags?: string[] | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      messages: {
+        Row: {
+          character_id: string | null
+          content: string
+          created_at: string | null
+          id: string
+          role: string
+          story_id: string
+        }
+        Insert: {
+          character_id?: string | null
+          content: string
+          created_at?: string | null
+          id: string
+          role: string
+          story_id: string
+        }
+        Update: {
+          character_id?: string | null
+          content?: string
+          created_at?: string | null
+          id?: string
+          role?: string
+          story_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "messages_character_id_fkey"
+            columns: ["character_id"]
+            isOneToOne: false
+            referencedRelation: "characters"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "messages_story_id_fkey"
+            columns: ["story_id"]
+            isOneToOne: false
+            referencedRelation: "stories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      scenes: {
+        Row: {
+          chapter_number: number
+          chapter_title: string
+          created_at: string | null
+          current_scene: string
+          id: string
+          present_characters: string[]
+          story_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          chapter_number: number
+          chapter_title: string
+          created_at?: string | null
+          current_scene: string
+          id: string
+          present_characters: string[]
+          story_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          chapter_number?: number
+          chapter_title?: string
+          created_at?: string | null
+          current_scene?: string
+          id?: string
+          present_characters?: string[]
+          story_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "scenes_story_id_fkey"
+            columns: ["story_id"]
+            isOneToOne: false
+            referencedRelation: "stories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      stories: {
+        Row: {
+          active_characters: string[]
+          created_at: string | null
+          genre: string | null
+          id: string
+          setting: string | null
+          story_stage: number
+          title: string
+          updated_at: string | null
+          user_character: string | null
+          user_name: string | null
+          user_role: string | null
+        }
+        Insert: {
+          active_characters: string[]
+          created_at?: string | null
+          genre?: string | null
+          id: string
+          setting?: string | null
+          story_stage: number
+          title: string
+          updated_at?: string | null
+          user_character?: string | null
+          user_name?: string | null
+          user_role?: string | null
+        }
+        Update: {
+          active_characters?: string[]
+          created_at?: string | null
+          genre?: string | null
+          id?: string
+          setting?: string | null
+          story_stage?: number
+          title?: string
+          updated_at?: string | null
+          user_character?: string | null
+          user_name?: string | null
+          user_role?: string | null
+        }
+        Relationships: []
+      }
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      akeys: {
+        Args: { "": unknown }
+        Returns: string[]
+      }
+      avals: {
+        Args: { "": unknown }
+        Returns: string[]
+      }
+      each: {
+        Args: { hs: unknown }
+        Returns: Record<string, unknown>[]
+      }
+      ghstore_compress: {
+        Args: { "": unknown }
+        Returns: unknown
+      }
+      ghstore_decompress: {
+        Args: { "": unknown }
+        Returns: unknown
+      }
+      ghstore_in: {
+        Args: { "": unknown }
+        Returns: unknown
+      }
+      ghstore_options: {
+        Args: { "": unknown }
+        Returns: undefined
+      }
+      ghstore_out: {
+        Args: { "": unknown }
+        Returns: unknown
+      }
+      hstore: {
+        Args: { "": string[] } | { "": Record<string, unknown> }
+        Returns: unknown
+      }
+      hstore_hash: {
+        Args: { "": unknown }
+        Returns: number
+      }
+      hstore_in: {
+        Args: { "": unknown }
+        Returns: unknown
+      }
+      hstore_out: {
+        Args: { "": unknown }
+        Returns: unknown
+      }
+      hstore_recv: {
+        Args: { "": unknown }
+        Returns: unknown
+      }
+      hstore_send: {
+        Args: { "": unknown }
+        Returns: string
+      }
+      hstore_subscript_handler: {
+        Args: { "": unknown }
+        Returns: unknown
+      }
+      hstore_to_array: {
+        Args: { "": unknown }
+        Returns: string[]
+      }
+      hstore_to_json: {
+        Args: { "": unknown }
+        Returns: Json
+      }
+      hstore_to_json_loose: {
+        Args: { "": unknown }
+        Returns: Json
+      }
+      hstore_to_jsonb: {
+        Args: { "": unknown }
+        Returns: Json
+      }
+      hstore_to_jsonb_loose: {
+        Args: { "": unknown }
+        Returns: Json
+      }
+      hstore_to_matrix: {
+        Args: { "": unknown }
+        Returns: string[]
+      }
+      hstore_version_diag: {
+        Args: { "": unknown }
+        Returns: number
+      }
+      skeys: {
+        Args: { "": unknown }
+        Returns: string[]
+      }
+      svals: {
+        Args: { "": unknown }
+        Returns: string[]
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
+}
+
+type DefaultSchema = Database[Extract<keyof Database, "public">]
+
+export type Tables<
+  DefaultSchemaTableNameOrOptions extends
+    | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
+    | { schema: keyof Database },
+  TableName extends DefaultSchemaTableNameOrOptions extends {
+    schema: keyof Database
+  }
+    ? keyof (Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+        Database[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
+    : never = never,
+> = DefaultSchemaTableNameOrOptions extends { schema: keyof Database }
+  ? (Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+      Database[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
+      Row: infer R
+    }
+    ? R
+    : never
+  : DefaultSchemaTableNameOrOptions extends keyof (DefaultSchema["Tables"] &
+        DefaultSchema["Views"])
+    ? (DefaultSchema["Tables"] &
+        DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
+        Row: infer R
+      }
+      ? R
+      : never
+    : never
+
+export type TablesInsert<
+  DefaultSchemaTableNameOrOptions extends
+    | keyof DefaultSchema["Tables"]
+    | { schema: keyof Database },
+  TableName extends DefaultSchemaTableNameOrOptions extends {
+    schema: keyof Database
+  }
+    ? keyof Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    : never = never,
+> = DefaultSchemaTableNameOrOptions extends { schema: keyof Database }
+  ? Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+      Insert: infer I
+    }
+    ? I
+    : never
+  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
+    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+        Insert: infer I
+      }
+      ? I
+      : never
+    : never
+
+export type TablesUpdate<
+  DefaultSchemaTableNameOrOptions extends
+    | keyof DefaultSchema["Tables"]
+    | { schema: keyof Database },
+  TableName extends DefaultSchemaTableNameOrOptions extends {
+    schema: keyof Database
+  }
+    ? keyof Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    : never = never,
+> = DefaultSchemaTableNameOrOptions extends { schema: keyof Database }
+  ? Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+      Update: infer U
+    }
+    ? U
+    : never
+  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
+    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+        Update: infer U
+      }
+      ? U
+      : never
+    : never
+
+export type Enums<
+  DefaultSchemaEnumNameOrOptions extends
+    | keyof DefaultSchema["Enums"]
+    | { schema: keyof Database },
+  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+    schema: keyof Database
+  }
+    ? keyof Database[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
+    : never = never,
+> = DefaultSchemaEnumNameOrOptions extends { schema: keyof Database }
+  ? Database[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][EnumName]
+  : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema["Enums"]
+    ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
+    : never
+
+export type CompositeTypes<
+  PublicCompositeTypeNameOrOptions extends
+    | keyof DefaultSchema["CompositeTypes"]
+    | { schema: keyof Database },
+  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+    schema: keyof Database
+  }
+    ? keyof Database[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
+    : never = never,
+> = PublicCompositeTypeNameOrOptions extends { schema: keyof Database }
+  ? Database[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
+  : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
+    ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
+    : never
+
+export const Constants = {
+  public: {
+    Enums: {},
+  },
+} as const

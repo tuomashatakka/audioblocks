@@ -25,6 +25,72 @@
     --ring: 240 4.9% 83.9%;
     --radius: 0.5rem;
   }
+
+  [data-theme="darcula"] {
+    --background: 220 10% 10%;
+    --foreground: 60 9% 98%;
+    --card: 220 10% 12%;
+    --card-foreground: 60 9% 98%;
+    --popover: 220 10% 12%;
+    --popover-foreground: 60 9% 98%;
+    --primary: 264 100% 50%;
+    --primary-foreground: 60 9% 98%;
+    --secondary: 220 10% 20%;
+    --secondary-foreground: 60 9% 98%;
+    --muted: 220 10% 20%;
+    --muted-foreground: 220 10% 70%;
+    --accent: 264 100% 50%;
+    --accent-foreground: 60 9% 98%;
+    --destructive: 0 70% 42%;
+    --destructive-foreground: 60 9% 98%;
+    --border: 220 10% 20%;
+    --input: 220 10% 20%;
+    --ring: 264 100% 50%;
+  }
+
+  [data-theme="catppuccino"] {
+    --background: 220 27% 88%;
+    --foreground: 220 27% 8%;
+    --card: 220 27% 92%;
+    --card-foreground: 220 27% 8%;
+    --popover: 220 27% 92%;
+    --popover-foreground: 220 27% 8%;
+    --primary: 316 72% 66%;
+    --primary-foreground: 220 27% 98%;
+    --secondary: 220 27% 82%;
+    --secondary-foreground: 220 27% 8%;
+    --muted: 220 27% 82%;
+    --muted-foreground: 220 27% 40%;
+    --accent: 316 72% 66%;
+    --accent-foreground: 220 27% 98%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 220 27% 98%;
+    --border: 220 27% 82%;
+    --input: 220 27% 82%;
+    --ring: 316 72% 66%;
+  }
+
+  [data-theme="nord"] {
+    --background: 220 16% 22%;
+    --foreground: 218 27% 94%;
+    --card: 220 16% 24%;
+    --card-foreground: 218 27% 94%;
+    --popover: 220 16% 24%;
+    --popover-foreground: 218 27% 94%;
+    --primary: 193 43% 67%;
+    --primary-foreground: 220 16% 22%;
+    --secondary: 220 16% 36%;
+    --secondary-foreground: 218 27% 94%;
+    --muted: 220 16% 36%;
+    --muted-foreground: 220 16% 80%;
+    --accent: 193 43% 67%;
+    --accent-foreground: 220 16% 22%;
+    --destructive: 354 42% 56%;
+    --destructive-foreground: 218 27% 94%;
+    --border: 220 16% 36%;
+    --input: 220 16% 36%;
+    --ring: 193 43% 67%;
+  }
 }
 
 @layer base {
@@ -116,6 +182,11 @@
 .track-block .waveform {
   @apply bg-primary/60 rounded-sm mx-px;
   transition: height 0.3s ease;
+}
+
+.track-block .resize-handle {
+  @apply absolute right-0 top-0 bottom-0 w-2 cursor-col-resize;
+  z-index: 20;
 }
 
 .playhead {
@@ -221,6 +292,39 @@ button:active {
 .remote-cursor {
   filter: drop-shadow(0 0 5px currentColor);
   transition: all 0.3s ease;
+}
+
+/* Track list collapse/expand */
+.track-list {
+  transition: width 0.3s ease;
+}
+
+.track-list.collapsed {
+  width: 48px !important;
+  min-width: 48px !important;
+}
+
+.track-list.collapsed .track-content {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.track-list-toggle {
+  @apply absolute right-0 top-1/2 -translate-y-1/2 translate-x-1/2 z-20;
+  width: 20px;
+  height: 40px;
+  background-color: hsl(var(--secondary));
+  border: 1px solid hsl(var(--border));
+  border-radius: 0 4px 4px 0;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.track-list-toggle:hover {
+  background-color: hsl(var(--accent));
 }
 
 body:after {

@@ -1,4 +1,3 @@
-
 import type { MarkerIcon } from "@/components/TimelineMarker";
 
 export enum ActionType {
@@ -147,6 +146,7 @@ export interface ProjectState {
   assets: Record<string, AssetInfo>;
   users: Record<string, UserInfo>;
   history: ProjectHistoryEntry[];
+  localUserId?: string; // Add this property to fix the TS errors
 }
 
 export interface TrackInfo {

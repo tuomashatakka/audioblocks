@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useReducer, useEffect, useState, useCallback } from 'react';
 import WebSocketService from '@/utils/WebSocketService';
 import { 
@@ -32,7 +31,8 @@ const initialProjectState: ProjectState = {
   },
   assets: {},
   users: {},
-  history: []
+  history: [],
+  localUserId: '' // Initialize with empty string
 };
 
 // Action types for the reducer
@@ -46,6 +46,7 @@ type ProjectAction =
   | { type: 'UPDATE_SETTINGS'; payload: Partial<ProjectState['settings']> }
   | { type: 'ADD_HISTORY_ENTRY'; payload: ProjectHistoryEntry }
   | { type: 'RESTORE_FROM_HISTORY'; payload: number }
+  | { type: 'SET_LOCAL_USER_ID'; payload: string } // Add this action type
   | { type: 'CLEAR_HISTORY' };
 
 // Reducer function
@@ -116,6 +117,12 @@ const projectReducer = (state: ProjectState, action: ProjectAction): ProjectStat
         ...state
       };
     
+    case 'SET_LOCAL_USER_ID':
+      return {
+        ...state,
+        localUserId: action.payload
+      };
+    
     case 'CLEAR_HISTORY':
       return {
         ...state,
@@ -168,6 +175,12 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
       };
       dispatch({ type: 'SET_PROJECT', payload: newProject });
     }
+    
+    // Set local user ID
+    dispatch({ 
+      type: 'SET_LOCAL_USER_ID', 
+      payload: webSocketService.getLocalUserId() 
+    });
     
     // Load history
     const history = webSocketService.getMessageHistory();

@@ -222,3 +222,14 @@ button:active {
   filter: drop-shadow(0 0 5px currentColor);
   transition: all 0.3s ease;
 }
+
+body:after {
+  content: "";
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  pointer-events: none;
+  background: linear-gradient(160deg, #aa40f0, #ffa0c0);
+}

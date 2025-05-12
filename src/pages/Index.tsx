@@ -446,7 +446,7 @@ const Index = () => {
 
   return (
     <div className="flex flex-col h-screen overflow-hidden bg-background text-foreground track-colors-default">
-      <div className="absolute inset-0 pointer-events-none bg-gradient-to-br from-blue-500/5 via-purple-500/5 to-pink-500/5 mix-blend-screen z-0" />
+      <div className="absolute inset-0 pointer-events-none bg-gradient-animate" />
       
       <Toolbar 
         isPlaying={isPlaying}
@@ -461,7 +461,7 @@ const Index = () => {
         usersCount={remoteUsers.length + 1}
       />
       
-      <div className="flex justify-between px-4 py-2 bg-secondary border-b border-border z-10">
+      <div className="flex justify-between px-4 py-2 bg-secondary/80 border-b border-border z-10 backdrop-blur-md">
         <ToolsMenu 
           activeTool={activeTool}
           onChangeTool={setActiveTool}
@@ -474,6 +474,7 @@ const Index = () => {
             variant="ghost" 
             size="sm" 
             onClick={() => setHistoryVisible(!historyVisible)}
+            className="hover:bg-primary/20"
           >
             <History size={16} className="mr-1" />
             History
@@ -483,6 +484,7 @@ const Index = () => {
             variant="ghost" 
             size="sm" 
             onClick={() => setIsSettingsOpen(true)}
+            className="hover:bg-primary/20"
           >
             <Settings size={16} className="mr-1" />
             Settings

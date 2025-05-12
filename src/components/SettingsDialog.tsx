@@ -1,4 +1,3 @@
-
 import React from "react";
 import {
   Dialog,
@@ -11,6 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
 
 interface SettingsDialogProps {
   open: boolean;
@@ -20,7 +20,7 @@ interface SettingsDialogProps {
     gridSize: number;
     autoSave: boolean;
     showCollaborators: boolean;
-    theme: "dark" | "light" | "system";
+    theme: "dark" | "light" | "darcula" | "catppuccino" | "nord";
   };
   onSettingsChange: (key: string, value: any) => void;
 }
@@ -121,18 +121,15 @@ const SettingsDialog: React.FC<SettingsDialogProps> = ({
             <div className="space-y-2">
               <Label>Theme</Label>
               <div className="grid grid-cols-3 gap-2">
-                {["dark", "light", "system"].map((theme) => (
-                  <button
+                {["dark", "darcula", "catppuccino", "nord"].map((theme) => (
+                  <Button
                     key={theme}
-                    className={`p-2 rounded-md border ${
-                      settings.theme === theme
-                        ? "border-primary bg-primary/20"
-                        : "border-border"
-                    }`}
+                    variant={settings.theme === theme ? "default" : "outline"}
+                    className="p-2 h-auto"
                     onClick={() => onSettingsChange("theme", theme)}
                   >
                     <div className="text-sm capitalize">{theme}</div>
-                  </button>
+                  </Button>
                 ))}
               </div>
             </div>

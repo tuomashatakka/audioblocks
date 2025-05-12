@@ -1,6 +1,6 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { cn } from '@/lib/utils';
+import { toast } from '@/hooks/use-toast';
 
 export interface TrackBlockProps {
   id: string;
@@ -109,6 +109,10 @@ const TrackBlock: React.FC<TrackBlockProps> = ({
     
     if (newTrack !== track || newBeat !== startBeat) {
       onPositionChange(id, newTrack, newBeat);
+      toast({
+        title: "Block Moved",
+        description: `Moved "${name}" to track ${newTrack + 1}, beat ${newBeat + 1}`,
+      });
     }
   };
   
@@ -128,6 +132,10 @@ const TrackBlock: React.FC<TrackBlockProps> = ({
     
     if (newLengthBeats !== lengthBeats) {
       onLengthChange(id, newLengthBeats);
+      toast({
+        title: "Block Resized",
+        description: `Changed "${name}" length to ${newLengthBeats} beats`,
+      });
     }
   };
   
@@ -173,7 +181,7 @@ const TrackBlock: React.FC<TrackBlockProps> = ({
       onMouseDown={handleMouseDown}
       onClick={(e) => {
         e.stopPropagation();
-        if (!isTrackLocked && activeTool === 'select') {
+        if (!isTrackLocked && activeTool === 'select' && !isResizing) {
           onSelect(id);
         }
       }}
@@ -214,10 +222,7 @@ const TrackBlock: React.FC<TrackBlockProps> = ({
       )}
       
       <div 
-        className={cn(
-          "resize-handle absolute right-0 top-0 bottom-0 w-2",
-          canInteract ? "cursor-col-resize" : "cursor-not-allowed"
-        )}
+        className="resize-handle"
         onMouseDown={handleResizeMouseDown}
       />
     </div>

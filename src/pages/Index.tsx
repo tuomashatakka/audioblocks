@@ -6,16 +6,15 @@ import Timeline from '@/components/Timeline';
 import SettingsDialog from '@/components/SettingsDialog';
 import RemoteUser from '@/components/RemoteUser';
 import ClipEditPopup from '@/components/ClipEditPopup';
-import ToolsMenu from '@/components/ToolsMenu';
 import ProjectHistoryDrawer from '@/components/ProjectHistoryDrawer';
 import { toast } from "@/hooks/use-toast";
-import { Settings, History } from 'lucide-react';
-import { Record } from '@/components/Record';
 import { Button } from '@/components/ui/button';
+import { Record } from '@/components/Record';
 import { ToolType } from '@/components/ToolsMenu';
 import { useProject } from '@/contexts/ProjectContext';
 import { TrackInfo } from '@/components/TrackList';
 import { ActionType } from '@/types/collaborative';
+import { ui } from '@/styles/ui-classes';
 
 interface Block {
   id: string;
@@ -445,8 +444,8 @@ const Index = () => {
   const selectedBlock = blocks.find(block => block.id === selectedBlockId);
 
   return (
-    <div className="flex flex-col h-screen overflow-hidden bg-background text-foreground track-colors-default">
-      <div className="absolute inset-0 pointer-events-none bg-gradient-animate" />
+    <div className={ui.layout.fullScreen}>
+      <div className={ui.overlay.gradient} />
       
       <Toolbar 
         isPlaying={isPlaying}
@@ -459,38 +458,14 @@ const Index = () => {
         onVolumeChange={setMasterVolume}
         onAddTrack={handleAddTrack}
         usersCount={remoteUsers.length + 1}
+        activeTool={activeTool}
+        onChangeTool={setActiveTool}
+        onZoomIn={handleZoomIn}
+        onZoomOut={handleZoomOut}
+        onOpenSettings={() => setIsSettingsOpen(true)}
+        historyVisible={historyVisible}
+        onToggleHistory={() => setHistoryVisible(!historyVisible)}
       />
-      
-      <div className="flex justify-between px-4 py-2 bg-secondary/80 border-b border-border z-10 backdrop-blur-md">
-        <ToolsMenu 
-          activeTool={activeTool}
-          onChangeTool={setActiveTool}
-          onZoomIn={handleZoomIn}
-          onZoomOut={handleZoomOut}
-        />
-        
-        <div className="flex items-center space-x-2">
-          <Button 
-            variant="ghost" 
-            size="sm" 
-            onClick={() => setHistoryVisible(!historyVisible)}
-            className="hover:bg-primary/20"
-          >
-            <History size={16} className="mr-1" />
-            History
-          </Button>
-          
-          <Button 
-            variant="ghost" 
-            size="sm" 
-            onClick={() => setIsSettingsOpen(true)}
-            className="hover:bg-primary/20"
-          >
-            <Settings size={16} className="mr-1" />
-            Settings
-          </Button>
-        </div>
-      </div>
       
       <div className="flex flex-grow overflow-hidden z-10">
         <TrackList 
@@ -524,7 +499,7 @@ const Index = () => {
           
           <div 
             ref={scrollContainerRef}
-            className="flex-grow relative overflow-auto"
+            className={ui.layout.growContainer}
             onClick={handleContainerClick}
             onDoubleClick={handleContainerDoubleClick}
             onScroll={handleScroll}

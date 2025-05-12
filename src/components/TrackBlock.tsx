@@ -1,6 +1,8 @@
+
 import React, { useState, useRef, useEffect } from 'react';
 import { cn } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
+import { ui } from '@/styles/ui-classes';
 
 export interface TrackBlockProps {
   id: string;
@@ -170,12 +172,11 @@ const TrackBlock: React.FC<TrackBlockProps> = ({
     <div
       ref={blockRef}
       className={cn(
-        "track-block absolute rounded-sm border-2 overflow-hidden",
-        "backdrop-blur-sm bg-black/30",
-        selected ? "border-primary shadow-lg" : "border-transparent",
-        isDragging ? "dragging" : "",
+        ui.trackBlock.base,
+        selected ? ui.trackBlock.selected : ui.trackBlock.notSelected,
+        isDragging ? ui.trackBlock.dragging : "",
         editingUserId && !selected ? `ring-2 ring-offset-1` : "",
-        isTrackLocked ? "opacity-70 cursor-not-allowed" : canInteract ? "cursor-move" : "cursor-default"
+        isTrackLocked ? ui.trackBlock.locked : canInteract ? ui.trackBlock.movable : "cursor-default"
       )}
       style={blockStyle}
       onMouseDown={handleMouseDown}
@@ -191,7 +192,7 @@ const TrackBlock: React.FC<TrackBlockProps> = ({
           {waveformPattern.map((height, i) => (
             <div 
               key={i}
-              className="waveform w-1"
+              className={ui.trackBlock.waveform}
               style={{ height: `${height * 100}%` }}
             />
           ))}
@@ -222,7 +223,7 @@ const TrackBlock: React.FC<TrackBlockProps> = ({
       )}
       
       <div 
-        className="resize-handle"
+        className={ui.trackBlock.resizeHandle}
         onMouseDown={handleResizeMouseDown}
       />
     </div>

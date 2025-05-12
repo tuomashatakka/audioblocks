@@ -233,5 +233,5 @@ body:after {
   pointer-events: none;
   background: linear-gradient(160deg, #aa40f0, #ffa0c0);
   z-index: 10000;
-  mix-blend-mode; screen;
+  mix-blend-mode: screen;
 }

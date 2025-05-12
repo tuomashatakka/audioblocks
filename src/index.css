@@ -231,7 +231,7 @@ body:after {
   right: 0;
   bottom: 0;
   pointer-events: none;
-  background: linear-gradient(160deg, #aa40f080, #ffa0c040);
+  background: linear-gradient(160deg, #aa40f020, #ffa0c040);
   z-index: 10000;
   mix-blend-mode: screen;
 }

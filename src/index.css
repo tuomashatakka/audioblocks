@@ -1,8 +1,10 @@
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
+  /* Theme variables - keep as is */
   :root {
     --background: 240 10% 3.9%;
     --foreground: 0 0% 98%;
@@ -26,6 +28,7 @@
     --radius: 0.5rem;
   }
 
+  /* All existing theme configurations - keep as is */
   [data-theme="darcula"] {
     --background: 220 10% 10%;
     --foreground: 60 9% 98%;
@@ -102,6 +105,25 @@
   }
 }
 
+/* Custom utility classes using theme variables */
+@layer utilities {
+  .box-shadow-primary {
+    box-shadow: 0 0 15px hsl(var(--primary));
+  }
+  
+  .box-shadow-sm {
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  }
+  
+  .backdrop-blur-sm {
+    backdrop-filter: blur(8px);
+  }
+  
+  .white-space-nowrap {
+    white-space: nowrap;
+  }
+}
+
 /* Timeline styles */
 .timeline-container {
   @apply bg-muted/50 border-b border-border relative;
@@ -109,28 +131,25 @@
 }
 
 .timeline-beats {
-  @apply absolute top-0 left-0 h-full;
-  pointer-events: none;
+  @apply absolute top-0 left-0 h-full pointer-events-none;
 }
 
 .timeline-bar {
-  @apply absolute top-0 left-0 h-full w-px bg-border;
-  pointer-events: none;
+  @apply absolute top-0 left-0 h-full w-px bg-border pointer-events-none;
 }
 
 .timeline-bar.bar-start {
   @apply bg-border/80 w-[2px];
-  box-shadow: 0 0 15px var(--primary);
+  box-shadow: 0 0 15px hsl(var(--primary));
 }
 
 .timeline-beat {
-  @apply absolute top-0 left-0 h-full w-px bg-border/50;
-  pointer-events: none;
+  @apply absolute top-0 left-0 h-full w-px bg-border/50 pointer-events-none;
 }
 
 .timeline-playhead {
   @apply absolute top-0 h-full w-px bg-primary;
-  box-shadow: 0 0 20px var(--primary);
+  box-shadow: 0 0 20px hsl(var(--primary));
   z-index: 10;
 }
 
@@ -191,7 +210,7 @@
 
 .playhead {
   @apply w-px bg-primary;
-  box-shadow: 0 0 20px var(--primary);
+  box-shadow: 0 0 20px hsl(var(--primary));
   z-index: 100;
   pointer-events: none;
 }
@@ -199,7 +218,7 @@
 /* Tools menu */
 .tool-active {
   @apply bg-accent text-accent-foreground;
-  box-shadow: 0 0 15px var(--primary);
+  box-shadow: 0 0 15px hsl(var(--primary));
 }
 
 /* Track colors */
@@ -241,7 +260,7 @@
 .bg-gradient-animate {
   background: linear-gradient(
     45deg,
-    rgba(255, 70, 106, 0.05),
+    rgba(var(--primary), 0.05),
     rgba(96, 165, 250, 0.05),
     rgba(100, 200, 80, 0.05)
   );
@@ -280,7 +299,7 @@ button:active {
 /* Slider enhancements */
 .slider-thumb {
   @apply bg-primary rounded-full;
-  box-shadow: 0 0 10px var(--primary);
+  box-shadow: 0 0 10px hsl(var(--primary));
   transition: transform 0.2s ease;
 }
 
@@ -335,7 +354,7 @@ body:after {
   right: 0;
   bottom: 0;
   pointer-events: none;
-  background: linear-gradient(160deg, #aa40f020, #ffa0c040);
+  background: linear-gradient(160deg, hsla(var(--primary), 0.05), hsla(calc(var(--primary) + 30), 0.1));
   z-index: 10000;
   mix-blend-mode: screen;
 }

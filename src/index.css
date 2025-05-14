@@ -23,7 +23,9 @@
     --border: 240 3.7% 15.9%;
     --input: 240 3.7% 15.9%;
     --ring: 240 4.9% 83.9%;
-    --radius: 0.5rem;
+    --radius: 2px;
+
+    --sidebar-background: 220 10% 10%
   }
 
   [data-theme="darcula"] {

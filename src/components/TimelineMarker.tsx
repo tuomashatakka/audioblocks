@@ -29,8 +29,7 @@ export interface TimelineMarkerProps {
   onDelete?: (id: string) => void;
 }
 
-const markerIcons: Record<MarkerIcon, React.ReactNode> = {
-  'record': <Record size={16} />,
+const markerIcons: Record<MarkerIcon, React.ReactNode>  'record': <Record size={16} />,
   'flag': <Flag size={16} />,
   'bookmark': <Bookmark size={16} />,
   'star': <Star size={16} />,
@@ -55,19 +54,19 @@ const TimelineMarker: React.FC<TimelineMarkerProps> = ({
     if (onClick) onClick(id);
   };
 
-  const ico = icon && markerIcons[icon] || null
+  const ico = icon && markerIcons[icon] || null;
 
   return (
     <Tooltip>
+      
       <TooltipTrigger asChild>
         <div 
           className="timeline-marker-item" 
           style={{ 
             left: `${position * pixelsPerBeat}px`,
             color: color
-          }}
-          onClick={handleClick}
-        >
+          }} onClick={handleClick}>
+          
           <div className="timeline-marker-line" />
           <div className="timeline-marker-icon">
             {ico}
@@ -80,10 +79,9 @@ const TimelineMarker: React.FC<TimelineMarkerProps> = ({
       </TooltipTrigger>
 
       <TooltipContent>
-        <div className={`flex flex-col text-[${color}]`}`>
-          <div className="font-medium">{label || 'Marker'}</div>
-          <div className="text-xs text-muted-foreground">
-            Position: {position}
+        <div className={`flex flex-col text-[${color}]`}>
+          <div className="font-medium">
+            {label}
           </div>
         </div>
       </TooltipContent>

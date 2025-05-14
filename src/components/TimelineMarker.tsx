@@ -55,7 +55,7 @@ const TimelineMarker: React.FC<TimelineMarkerProps> = ({
     if (onClick) onClick(id);
   };
 
-  const ico = markerIcons[icon] || null
+  const ico = icon && markerIcons[icon] || null
 
   return (
     <Tooltip>

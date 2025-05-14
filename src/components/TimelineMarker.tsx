@@ -55,6 +55,8 @@ const TimelineMarker: React.FC<TimelineMarkerProps> = ({
     if (onClick) onClick(id);
   };
 
+  const ico = markerIcons[icon] || null
+
   return (
     <Tooltip>
       <TooltipTrigger asChild>
@@ -68,15 +70,17 @@ const TimelineMarker: React.FC<TimelineMarkerProps> = ({
         >
           <div className="timeline-marker-line" />
           <div className="timeline-marker-icon">
-            {markerIcons[icon]}
+            {ico}
           </div>
-          {label && (
-            <div className="timeline-marker-label">{label}</div>
+          <div className="timeline-marker-label">
+            {label}
+          </div>
           )}
         </div>
       </TooltipTrigger>
+
       <TooltipContent>
-        <div className="flex flex-col">
+        <div className={`flex flex-col text-[${color}]`}`>
           <div className="font-medium">{label || 'Marker'}</div>
           <div className="text-xs text-muted-foreground">
             Position: {position}

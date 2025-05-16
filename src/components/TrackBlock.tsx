@@ -1,9 +1,9 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { cn } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
 import { ui } from '@/styles/ui-classes';
 import BlockContextMenu from './BlockContextMenu';
+import { Lock } from 'lucide-react';
 
 export interface TrackBlockProps {
   id: string;
@@ -28,6 +28,7 @@ const TrackBlock: React.FC<TrackBlockProps> = ({
   track,
   startBeat,
   lengthBeats,
+  color = '#5096FF', // Add default color
   name,
   selected,
   onSelect,
@@ -301,7 +302,7 @@ const TrackBlock: React.FC<TrackBlockProps> = ({
         
         {isLocked && (
           <div className="absolute right-2 top-2 text-yellow-500">
-            <Lock className="h-3 w-3" />
+            <Lock size={12} />
           </div>
         )}
       </div>

@@ -62,6 +62,27 @@ export const ui = {
     playhead: "absolute top-0 h-full w-px bg-primary box-shadow-primary z-10",
   },
   
+  // DAW UI elements
+  daw: {
+    trackHeader: "flex items-center px-2 py-1 border-b border-border bg-secondary/60",
+    trackControls: "flex items-center gap-1",
+    trackName: "text-xs font-medium truncate",
+    trackColor: "w-2 h-full absolute left-0 top-0 bottom-0",
+    mixer: {
+      channel: "flex flex-col items-center border-r border-border",
+      fader: "h-32 w-6 bg-secondary rounded-full",
+      knob: "w-6 h-6 rounded-full bg-secondary border border-border",
+      meter: "h-24 w-2 bg-secondary/50 rounded-full overflow-hidden",
+      meterLevel: "absolute bottom-0 w-full bg-primary rounded-full",
+    },
+    transport: {
+      container: "flex items-center gap-2 px-4 py-1 bg-secondary border-b border-border",
+      button: "h-8 w-8 flex items-center justify-center rounded-full hover:bg-accent/50",
+      timeDisplay: "font-mono text-xs px-2 py-1 bg-background/60 rounded border border-border",
+      tempoDisplay: "font-mono text-xs px-2 py-1 bg-background/60 rounded border border-border",
+    },
+  },
+  
   // Markers
   marker: {
     item: "absolute top-0 flex flex-col items-center cursor-pointer z-20 transition-transform hover:scale-110",
@@ -92,5 +113,14 @@ export const ui = {
     fadeIn: "animate-in fade-in-0",
     slideIn: "animate-in slide-in-from-bottom-3",
     pulse: "animate-pulse",
+  },
+  
+  // DAW specific resizable panels
+  panel: {
+    resizable: "border border-border overflow-hidden resize",
+    handle: "absolute top-0 right-0 w-2 h-full cursor-ew-resize bg-border/30 hover:bg-primary/30",
+    header: "bg-secondary/80 border-b border-border px-3 py-1 text-sm font-medium flex items-center justify-between",
+    headerButtons: "flex items-center gap-1",
+    scrollArea: "h-full overflow-auto custom-scrollbar",
   },
 };

@@ -13,8 +13,7 @@ import NotFound from "./pages/NotFound";
 const queryClient = new QueryClient();
 
 const App: React.FC = () => {
-  return (
-    <React.StrictMode>
+  return <React.StrictMode>
       <QueryClientProvider client={queryClient}>
         <TooltipProvider>
           <ProjectProvider>
@@ -31,7 +30,6 @@ const App: React.FC = () => {
         </TooltipProvider>
       </QueryClientProvider>
     </React.StrictMode>
-  );
 };
 
 export default App;

@@ -25,7 +25,9 @@
     --border: 240 3.7% 15.9%;
     --input: 240 3.7% 15.9%;
     --ring: 240 4.9% 83.9%;
-    --radius: 0.5rem;
+    --radius: 2px;
+
+    --sidebar-background: 220 10% 10%
   }
 
   /* All existing theme configurations - keep as is */
@@ -158,6 +160,7 @@
   @apply absolute top-0 flex flex-col items-center cursor-pointer;
   z-index: 20;
   transition: transform 0.2s ease;
+  height: 2em
 }
 
 .timeline-marker-item:hover {

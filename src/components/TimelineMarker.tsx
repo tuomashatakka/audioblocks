@@ -1,4 +1,4 @@
-import React from 'react';
+import React from 'react'
 import { 
   Flag, 
   Bookmark, 
@@ -7,26 +7,25 @@ import {
   Music,
   Zap,
   MessageCircle
-} from 'lucide-react';
-import { Record } from './Record';
+} from 'lucide-react'
+import { Record } from './Record'
 import { 
   Tooltip,
   TooltipContent,
   TooltipTrigger
-} from '@/components/ui/tooltip';
-import { cn } from '@/lib/utils';
+} from '@/components/ui/tooltip'
 
-export type MarkerIcon = 'record' | 'flag' | 'bookmark' | 'star' | 'mic' | 'music' | 'zap' | 'comment';
+export type MarkerIcon = 'record' | 'flag' | 'bookmark' | 'star' | 'mic' | 'music' | 'zap' | 'comment'
 
 export interface TimelineMarkerProps {
-  id: string;
-  position: number;
-  color: string;
-  icon: MarkerIcon;
-  label?: string;
-  pixelsPerBeat: number;
-  onClick?: (id: string) => void;
-  onDelete?: (id: string) => void;
+  id: string
+  position: number
+  color: string
+  icon: MarkerIcon
+  label?: string
+  pixelsPerBeat: number
+  onClick?: (id: string) => void
+  onDelete?: (id: string) => void
 }
 
 const markerIcons: Record<MarkerIcon, React.ReactNode> = {
@@ -38,7 +37,7 @@ const markerIcons: Record<MarkerIcon, React.ReactNode> = {
   'music': <Music size={16} />,
   'zap': <Zap size={16} />,
   'comment': <MessageCircle size={16} />
-};
+}
 
 const TimelineMarker: React.FC<TimelineMarkerProps> = ({
   id,
@@ -51,9 +50,11 @@ const TimelineMarker: React.FC<TimelineMarkerProps> = ({
   onDelete
 }) => {
   const handleClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (onClick) onClick(id);
-  };
+    e.stopPropagation()
+    if (onClick) onClick(id)
+  }
+
+  const ico = icon && markerIcons[icon] || null
 
   return (
     <Tooltip>
@@ -63,28 +64,28 @@ const TimelineMarker: React.FC<TimelineMarkerProps> = ({
           style={{ 
             left: `${position * pixelsPerBeat}px`,
             color: color
-          }}
+          }} 
           onClick={handleClick}
         >
           <div className="timeline-marker-line" />
           <div className="timeline-marker-icon">
-            {markerIcons[icon]}
+            {ico}
           </div>
-          {label && (
-            <div className="timeline-marker-label">{label}</div>
-          )}
+          <div className="timeline-marker-label">
+            {label}
+          </div>
         </div>
       </TooltipTrigger>
+
       <TooltipContent>
-        <div className="flex flex-col">
-          <div className="font-medium">{label || 'Marker'}</div>
-          <div className="text-xs text-muted-foreground">
-            Position: {position}
+        <div className={`flex flex-col text-[${color}]`}>
+          <div className="font-medium">
+            {label}
           </div>
         </div>
       </TooltipContent>
     </Tooltip>
-  );
-};
+  )
+}
 
-export default TimelineMarker;
+export default TimelineMarker

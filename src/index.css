@@ -110,15 +110,15 @@
   .box-shadow-primary {
     box-shadow: 0 0 15px hsl(var(--primary));
   }
-  
+
   .box-shadow-sm {
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
   }
-  
+
   .backdrop-blur-sm {
     backdrop-filter: blur(8px);
   }
-  
+
   .white-space-nowrap {
     white-space: nowrap;
   }
@@ -343,6 +343,7 @@ button:active {
 }
 
 .track-list-toggle:hover {
+  @apply absolute right-0 top-1/2 -translate-y-1/2 translate-x-1/2 z-20;
   background-color: hsl(var(--accent));
 }
 
@@ -354,7 +355,8 @@ body:after {
   right: 0;
   bottom: 0;
   pointer-events: none;
-  background: linear-gradient(160deg, hsla(var(--primary), 0.05), hsla(calc(var(--primary) + 30), 0.1));
+  /* background: linear-gradient(160deg, hsla(var(--primary), 0.05), hsla(calc(var(--primary) + 30), 0.1)); */
+  background: linear-gradient(160deg, #aa40f020, #ffa0c040);
   z-index: 10000;
   mix-blend-mode: screen;
 }

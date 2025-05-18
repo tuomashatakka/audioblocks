@@ -2,14 +2,14 @@
  * A browser-compatible EventEmitter implementation
  */
 export class EventEmitter {
-  private events: Record<string, Function[]> = {}
+  private events: Record<string, EventListener[]> = {}
 
   /**
    * Register an event handler
    * @param event Event name
    * @param listener Function to execute when the event is triggered
    */
-  on (event: string, listener: Function): this {
+  on (event: string, listener: EventListener): this {
     if (!this.events[event])
       this.events[event] = []
     this.events[event].push(listener)
@@ -21,9 +21,9 @@ export class EventEmitter {
    * @param event Event name
    * @param listener Function to execute when the event is triggered
    */
-  once (event: string, listener: Function): this {
+  once (event: string, listener: EventListener): this {
     const onceWrapper = (...args: any[]) => {
-      listener(...args)
+      listener(...args as [ Event ])
       this.off(event, onceWrapper)
     }
     return this.on(event, onceWrapper)
@@ -34,7 +34,7 @@ export class EventEmitter {
    * @param event Event name
    * @param listener Function to remove
    */
-  off (event: string, listener: Function): this {
+  off (event: string, listener: EventListener): this {
     if (this.events[event])
       this.events[event] = this.events[event].filter(l => l !== listener)
     return this
@@ -61,7 +61,7 @@ export class EventEmitter {
       return false
 
     this.events[event].forEach(listener => {
-      listener(...args)
+      listener(...args as [ Event ])
     })
     return true
   }

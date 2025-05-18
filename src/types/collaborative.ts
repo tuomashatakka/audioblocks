@@ -231,15 +231,15 @@ export const actionDescriptions: {[key in ActionType]: (...params: Array<string 
       return `Changed track color`
     return `Updated track properties`
   },
-  [ActionType.MUTE_TRACK]:       params => `${params.muted ? 'Muted' : 'Unmuted'} track`,
-  [ActionType.SOLO_TRACK]:       params => `${params.solo ? 'Soloed' : 'Unsoloed'} track`,
-  [ActionType.ARM_TRACK]:        params => `${params.armed ? 'Armed' : 'Disarmed'} track for recording`,
+  [ActionType.MUTE_TRACK]:       (params: any) => `${params.muted ? 'Muted' : 'Unmuted'} track`,
+  [ActionType.SOLO_TRACK]:       (params: any) => `${params.solo ? 'Soloed' : 'Unsoloed'} track`,
+  [ActionType.ARM_TRACK]:        (params: any) => `${params.armed ? 'Armed' : 'Disarmed'} track for recording`,
   [ActionType.SET_TRACK_VOLUME]: description `Set track volume to ${'volume'}`,
   [ActionType.ADD_BLOCK]:        description `Added clip "${'blockName'}"`,
   [ActionType.REMOVE_BLOCK]:     description `Removed clip "${'blockName'}"`,
   [ActionType.MOVE_BLOCK]:       description `Moved clip to position ${'startBeat'}`,
   [ActionType.RESIZE_BLOCK]:     description `Resized clip to ${'lengthBeats'} beats`,
-  [ActionType.UPDATE_BLOCK]:     params => {
+  [ActionType.UPDATE_BLOCK]:     (params: any) => {
     if (params.name)
       return `Renamed clip to "${params.name}"`
     if (params.pitch !== undefined)
@@ -259,4 +259,34 @@ export const actionDescriptions: {[key in ActionType]: (...params: Array<string 
   [ActionType.UPLOAD_FILE_CHUNK]:    description `Uploading file chunk ${'chunkIndex'} of ${'totalChunks'}`,
   [ActionType.COMPLETE_FILE_UPLOAD]: description `Completed uploading file "${'fileName'}"`,
   [ActionType.IMPORT_AUDIO_SAMPLE]:  description `Imported audio file "${'fileName'}"`,
+  [ActionType.CREATE_PROJECT]:       function (...params: Array<string | Record<string, string>>): string {
+    throw new Error('Function not implemented.')
+  },
+  [ActionType.OPEN_PROJECT]: function (...params: Array<string | Record<string, string>>): string {
+    throw new Error('Function not implemented.')
+  },
+  [ActionType.SAVE_PROJECT]: function (...params: Array<string | Record<string, string>>): string {
+    throw new Error('Function not implemented.')
+  },
+  [ActionType.PLAY]: function (...params: Array<string | Record<string, string>>): string {
+    throw new Error('Function not implemented.')
+  },
+  [ActionType.PAUSE]: function (...params: Array<string | Record<string, string>>): string {
+    throw new Error('Function not implemented.')
+  },
+  [ActionType.RESTART]: function (...params: Array<string | Record<string, string>>): string {
+    throw new Error('Function not implemented.')
+  },
+  [ActionType.SEEK]: function (...params: Array<string | Record<string, string>>): string {
+    throw new Error('Function not implemented.')
+  },
+  [ActionType.USER_JOINED]: function (...params: Array<string | Record<string, string>>): string {
+    throw new Error('Function not implemented.')
+  },
+  [ActionType.USER_LEFT]: function (...params: Array<string | Record<string, string>>): string {
+    throw new Error('Function not implemented.')
+  },
+  [ActionType.CURSOR_MOVE]: function (...params: Array<string | Record<string, string>>): string {
+    throw new Error('Function not implemented.')
+  }
 }

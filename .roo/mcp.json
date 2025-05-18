@@ -1,0 +1,55 @@
+{
+  "mcpServers": {
+    "memory": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-memory"
+      ]
+    },
+    "fetch": {
+      "command": "uvx",
+      "args": [
+        "mcp-server-fetch"
+      ],
+      "alwaysAllow": [
+        "fetch"
+      ]
+    },
+    "git": {
+      "command": "uvx",
+      "args": [
+        "mcp-server-git"
+      ]
+    },
+    "filesystem": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-filesystem",
+        "/Users/tvndra/Documents/Projects",
+        "/Users/tvndra/Documents"
+      ]
+    },
+    "sequential-thinking": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-sequential-thinking"
+      ]
+    },
+    "supabase": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@supabase/mcp-server-supabase@latest",
+        "--access-token",
+        "sbp_e644a64d762da947c1490874c48562022361eb3b"
+      ],
+      "alwaysAllow": [
+        "list_projects",
+        "list_tables"
+      ]
+    }
+  }
+}

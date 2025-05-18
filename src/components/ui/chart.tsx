@@ -21,6 +21,7 @@ type ChartContextProps = {
 }
 
 const ChartContext = React.createContext<ChartContextProps | null>(null)
+ChartContext.displayName = 'ChartContext'
 
 function useChart () {
   const context = React.useContext(ChartContext)
@@ -137,8 +138,7 @@ const ChartTooltipContent = React.forwardRef<
           : itemConfig?.label
 
       if (labelFormatter)
-        return
-      <div className={ cn('font-medium', labelClassName) }>
+        return <div className={ cn('font-medium', labelClassName) }>
         {labelFormatter(value, payload)}
       </div>
 
@@ -176,8 +176,7 @@ const ChartTooltipContent = React.forwardRef<
           const itemConfig = getPayloadConfigFromPayload(config, item, key)
           const indicatorColor = color || item.payload.fill || item.color
 
-          return
-          <div
+          return <div
             key={ item.dataKey }
             className={ cn(
               'flex w-full flex-wrap items-stretch gap-2 [&>svg]:h-2.5 [&>svg]:w-2.5 [&>svg]:text-muted-foreground',
@@ -268,8 +267,7 @@ const ChartLegendContent = React.forwardRef<
         const key = `${nameKey || item.dataKey || 'value'}`
         const itemConfig = getPayloadConfigFromPayload(config, item, key)
 
-        return
-        <div
+        return <div
           key={ item.value }
           className={ cn(
             'flex items-center gap-1.5 [&>svg]:h-3 [&>svg]:w-3 [&>svg]:text-muted-foreground'

@@ -116,6 +116,7 @@ const Carousel = React.forwardRef<
     }, [ api, onSelect ])
 
     return <CarouselContext.Provider
+      // FIXME
       value={{
         carouselRef,
         api: api,

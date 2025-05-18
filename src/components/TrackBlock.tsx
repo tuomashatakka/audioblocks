@@ -24,6 +24,7 @@ export interface TrackBlockProps {
   activeTool?:      'select' | 'pan' | 'boxSelect';
 }
 
+// eslint-disable-next-line complexity
 const TrackBlock: React.FC<TrackBlockProps> = ({
   id,
   track,

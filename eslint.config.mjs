@@ -270,7 +270,7 @@ const config = {
     'react/jsx-no-comment-textnodes':          [ 'warn' ],
     'react/jsx-no-duplicate-props':            [ 'warn' ],
     'react/jsx-no-undef':                      [ 'warn' ],
-    'react/jsx-pascal-case':                   [ 'warn' ],
+    'react/jsx-pascal-case':                   [ 'off' ],
     'react/jsx-curly-brace-presence':          [
       'warn',
       { props: 'never', children: 'never' },

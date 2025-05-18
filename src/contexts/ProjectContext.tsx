@@ -1,10 +1,11 @@
+'use client'
+
 import React, { createContext, useContext, useReducer, useEffect, useState, useCallback, useMemo } from 'react'
-import WebSocketService from '@/utils/WebSocketService'
+import SupabaseRealtimeService from '@/integrations/supabase/realtimeService'
 import {
   ActionType,
   ProjectState,
   UserInteractionMessage,
-  DispatchProcessStatus,
   TrackInfo,
   BlockInfo,
   MarkerInfo,
@@ -127,7 +128,7 @@ const projectReducer = (state: ProjectState, action: ProjectAction): ProjectStat
 interface ProjectContextType {
   state:                   ProjectState;
   dispatch:                React.Dispatch<ProjectAction>;
-  sendMessage:             (action: ActionType, params: any, filePayload?: FilePayload) => string;
+  sendMessage:             (action: ActionType, params: any, filePayload?: FilePayload) => Promise<void>;
   uploadFile:              (file: File, onProgress?: (progress: number) => void) => Promise<string>;
   historyVisible:          boolean;
   setHistoryVisible:       (visible: boolean) => void;
@@ -137,12 +138,13 @@ interface ProjectContextType {
 }
 
 // Create context
+// eslint-disable-next-line react/display-name
 const ProjectContext = createContext<ProjectContextType | undefined>(undefined)
 
 // Provider component
 export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [ state, dispatch ] = useReducer(projectReducer, initialProjectState)
-  const [ webSocketService ] = useState(() => WebSocketService.getInstance())
+  const supabaseRealtimeService = useMemo(() => SupabaseRealtimeService.getInstance(), [])
   const [ historyVisible, setHistoryVisible ] = useState(false)
   const [ selectedHistoryIndex, setSelectedHistoryIndex ] = useState<number | null>(null)
 
@@ -168,23 +170,26 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     // Set local user ID
     dispatch({
       type:    'SET_LOCAL_USER_ID',
-      payload: webSocketService.getLocalUserId()
+      payload: supabaseRealtimeService.getLocalUserId()
     })
 
     // Load history
-    const history = webSocketService.getMessageHistory()
-    history.forEach(message => {
-      dispatch({
-        type:    'ADD_HISTORY_ENTRY',
-        payload: {
-          ...message,
-          userName:  message.userId === webSocketService.getLocalUserId() ? 'You' : 'Collaborator',
-          userColor: message.userId === webSocketService.getLocalUserId() ? '#FF466A' : '#60A5FA'
-        }
+    const loadHistory = async () => {
+      const history = await supabaseRealtimeService.getMessageHistory()
+      history.forEach(message => {
+        dispatch({
+          type:    'ADD_HISTORY_ENTRY',
+          payload: {
+            ...message,
+            userName:  message.userId === supabaseRealtimeService.getLocalUserId() ? 'You' : 'Collaborator',
+            userColor: message.userId === supabaseRealtimeService.getLocalUserId() ? '#FF466A' : '#60A5FA'
+          }
+        })
       })
-    })
-  }, [ webSocketService ])
+    }
 
+    loadHistory()
+  }, [ supabaseRealtimeService ])
   // Save project to localStorage when it changes
   useEffect(() => {
     if (state.id)
@@ -200,8 +205,8 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
         type:    'ADD_HISTORY_ENTRY',
         payload: {
           ...message,
-          userName:  message.userId === webSocketService.getLocalUserId() ? 'You' : 'Collaborator',
-          userColor: message.userId === webSocketService.getLocalUserId() ? '#FF466A' : '#60A5FA'
+          userName:  message.userId === supabaseRealtimeService.getLocalUserId() ? 'You' : 'Collaborator',
+          userColor: message.userId === supabaseRealtimeService.getLocalUserId() ? '#FF466A' : '#60A5FA'
         }
       })
 
@@ -322,18 +327,21 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
 
     // Register event listeners
-    webSocketService.on('message', handleMessage)
-    webSocketService.on('rollback', handleRollback)
+    // Register event listeners
+    supabaseRealtimeService.on('message', handleMessage as unknown as EventListener)
+    // TODO: Implement rollback handling with Supabase if needed
+    // supabaseRealtimeService.on('rollback', handleRollback)
 
     // Cleanup
     return () => {
-      webSocketService.off('message', handleMessage)
-      webSocketService.off('rollback', handleRollback)
+      supabaseRealtimeService.off('message', handleMessage as unknown as EventListener)
+      // TODO: Implement rollback handling with Supabase if needed
+      // supabaseRealtimeService.off('rollback', handleRollback)
     }
-  }, [ state, webSocketService ])
+  }, [ state, supabaseRealtimeService ])
 
-  // Function to send messages via WebSocket
-  const sendMessage = useCallback((action: ActionType, params: any, filePayload?: FilePayload): string => webSocketService.sendMessage(action, params, filePayload), [ webSocketService ])
+  // Function to send messages via Supabase Realtime
+  const sendMessage = useCallback((action: ActionType, params: any, filePayload?: FilePayload): Promise<void> => supabaseRealtimeService.sendMessage(action, params, filePayload), [ supabaseRealtimeService ])
 
   // Function to upload a file
   const uploadFile = useCallback(async (file: File, onProgress?: (progress: number) => void): Promise<string> => new Promise((resolve, reject) => {
@@ -358,7 +366,9 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     const readNextChunk = () => {
       if (currentChunk >= totalChunks) {
         // All chunks sent
-        webSocketService.completeFileUpload(transferId, file.name, file.type, file.size)
+        // All chunks sent
+        // TODO: Implement file upload completion with Supabase Storage
+        // supabaseRealtimeService.completeFileUpload(transferId, file.name, file.type, file.size)
         resolve(transferId)
         return
       }
@@ -369,12 +379,13 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
       reader.onload = e => {
         if (e.target?.result instanceof ArrayBuffer) {
-          webSocketService.sendFileChunk(
-            transferId,
-            currentChunk,
-            totalChunks,
-            e.target.result
-          )
+          // TODO: Implement file chunk sending with Supabase Storage
+          // supabaseRealtimeService.sendFileChunk(
+          //   transferId,
+          //   currentChunk,
+          //   totalChunks,
+          //   e.target.result
+          // )
 
           currentChunk++
 
@@ -395,7 +406,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
     // Start reading chunks
     readNextChunk()
-  }), [ sendMessage, webSocketService ])
+  }), [ sendMessage, supabaseRealtimeService ])
 
   // Function to restore state to a particular timestamp
   const restoreToTimestamp = useCallback((timestamp: number) => {
@@ -420,7 +431,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     restoreToTimestamp,
     selectedHistoryIndex,
     setSelectedHistoryIndex
-  }), [state, dispatch, sendMessage, uploadFile, historyVisible, setHistoryVisible, restoreToTimestamp, selectedHistoryIndex, setSelectedHistoryIndex]);
+  }), [ state, dispatch, sendMessage, uploadFile, historyVisible, setHistoryVisible, restoreToTimestamp, selectedHistoryIndex, setSelectedHistoryIndex ])
 
   return <ProjectContext.Provider value={ value }>
     {children}

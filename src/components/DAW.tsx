@@ -1,3 +1,5 @@
+'use client'
+
 import React, { useState, useEffect, useRef } from 'react'
 import Toolbar from '@/components/Toolbar'
 import TrackList from '@/components/TrackList'
@@ -51,7 +53,7 @@ const remoteUsers: RemoteUserInfo[] = [
 ]
 
 // eslint-disable-next-line max-statements
-const Index = () => {
+export const DAW = () => {
   const { state, sendMessage, historyVisible, setHistoryVisible } = useProject()
 
   const [ isPlaying, setIsPlaying ] = useState(false)
@@ -583,5 +585,3 @@ const Index = () => {
     }
   </div>
 }
-
-export default Index

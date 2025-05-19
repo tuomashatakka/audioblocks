@@ -27,8 +27,7 @@
       "args": [
         "-y",
         "@modelcontextprotocol/server-filesystem",
-        "/Users/tvndra/Documents/Projects",
-        "/Users/tvndra/Documents"
+        "/Users/tvndra/Documents/Projects/Audio/audioblocks"
       ]
     },
     "sequential-thinking": {

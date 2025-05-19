@@ -3,6 +3,8 @@
 @tailwind components;
 @tailwind utilities;
 
+@import 'daw.css';
+
 @layer base {
   /* Theme variables - keep as is */
   :root {

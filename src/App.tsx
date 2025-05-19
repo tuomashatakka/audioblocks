@@ -6,7 +6,6 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { ProjectProvider } from '@/contexts/ProjectContext'
 
 
-
 // Create a new QueryClient instance
 const queryClient = new QueryClient()
 

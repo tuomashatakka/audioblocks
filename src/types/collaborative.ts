@@ -136,18 +136,19 @@ export interface FileUploadParams {
 }
 
 export interface ProjectState {
-  id:           string;
-  name:         string;
-  bpm:          number;
-  tracks:       Record<string, TrackInfo>;
-  blocks:       Record<string, BlockInfo>;
-  markers:      Record<string, MarkerInfo>;
-  masterVolume: number;
-  settings:     ProjectSettings;
-  assets:       Record<string, AssetInfo>;
-  users:        Record<string, UserInfo>;
-  history:      ProjectHistoryEntry[];
-  localUserId?: string; // Add this property to fix the TS errors
+  id:             string;
+  name:           string;
+  bpm:            number;
+  tracks:         Record<string, TrackInfo>;
+  blocks:         Record<string, BlockInfo>;
+  markers:        Record<string, MarkerInfo>;
+  masterVolume:   number;
+  settings:       ProjectSettings;
+  assets:         Record<string, AssetInfo>;
+  users:          Record<string, UserInfo>;
+  history:        ProjectHistoryEntry[];
+  localUserId:    string;
+  editingBlockId: string | null;
 }
 
 export interface TrackInfo {
@@ -164,14 +165,14 @@ export interface TrackInfo {
 
 export interface BlockInfo {
   id:             string;
-  name:           string;
+  name?:          string;
   trackId:        string;
-  startBeat:      number;
-  lengthBeats:    number;
-  volume:         number;
-  pitch:          number;
+  startTime:      number;
+  endTime:        number;
+  volume?:        number;
+  pitch?:         number;
   editingUserId?: string | null;
-  fileId?:        string; // Reference to an audio file
+  audioUrl?:      string | null;
 }
 
 export interface MarkerInfo {

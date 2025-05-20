@@ -285,6 +285,61 @@ const Index = () => {
     });
   };
 
+  const handleTrackLockToggle = (trackId: string) => {
+    setTracks(prevTracks => {
+      const updatedTracks = prevTracks.map(track => {
+        if (track.id === trackId) {
+          const newLockedState = !track.locked;
+          
+          // Send lock/unlock message based on new state
+          if (newLockedState) {
+            sendMessage(ActionType.LOCK_TRACK, { trackId, userId: state.localUserId });
+          } else {
+            sendMessage(ActionType.UNLOCK_TRACK, { trackId });
+          }
+          
+          return { 
+            ...track, 
+            locked: newLockedState,
+            lockedByUser: newLockedState ? state.localUserId : null 
+          };
+        }
+        return track;
+      });
+      
+      return updatedTracks;
+    });
+    
+    toast({
+      title: "Track Lock Changed",
+      description: "Track locking status has been updated.",
+    });
+  };
+
+  const handleTrackRename = (trackId: string, newName: string) => {
+    setTracks(prevTracks => 
+      prevTracks.map(track => 
+        track.id === trackId 
+          ? { ...track, name: newName } 
+          : track
+      )
+    );
+    
+    sendMessage(ActionType.RENAME_TRACK, { trackId, name: newName });
+    
+    toast({
+      title: "Track Renamed",
+      description: `Track has been renamed to "${newName}".`,
+    });
+  };
+
+  const handleTrackListScroll = (scrollTop: number) => {
+    if (scrollContainerRef.current) {
+      scrollContainerRef.current.scrollTop = scrollTop;
+      setVerticalScrollPosition(scrollTop);
+    }
+  };
+
   const handleAddTrack = () => {
     const newTrackId = `track${tracks.length + 1}`;
     const colors = ['#FF466A', '#FFB446', '#64C850', '#5096FF'];

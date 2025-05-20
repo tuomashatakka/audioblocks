@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useReducer, useEffect, useState, useCallback } from 'react';
 import WebSocketService from '@/utils/WebSocketService';
+import { supabase } from '@/integrations/supabase/client';
 import { 
   ActionType,
   ProjectState,
@@ -27,7 +28,8 @@ const initialProjectState: ProjectState = {
     gridSize: 1,
     autoSave: true,
     showCollaborators: true,
-    theme: 'dark'
+    theme: 'dark',
+    userName: ''
   },
   assets: {},
   users: {},
@@ -145,6 +147,12 @@ interface ProjectContextType {
   restoreToTimestamp: (timestamp: number) => void;
   selectedHistoryIndex: number | null;
   setSelectedHistoryIndex: (index: number | null) => void;
+  lockTrack: (trackId: string) => void;
+  unlockTrack: (trackId: string) => void;
+  updateUserName: (name: string) => void;
+  getProjectFromSupabase: (projectId: string) => Promise<void>;
+  saveProjectToSupabase: () => Promise<void>;
+  createNewProject: (name: string, bpm: number) => Promise<string>;
 }
 
 // Create context
@@ -156,6 +164,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const [webSocketService] = useState(() => WebSocketService.getInstance());
   const [historyVisible, setHistoryVisible] = useState(false);
   const [selectedHistoryIndex, setSelectedHistoryIndex] = useState<number | null>(null);
+  const [currentUsers, setCurrentUsers] = useState<Record<string, {userName: string, x: number, y: number}>>({});
   
   // Initialize project from localStorage or create new one
   useEffect(() => {
@@ -164,6 +173,11 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
       try {
         const parsedProject = JSON.parse(savedProject);
         dispatch({ type: 'SET_PROJECT', payload: parsedProject });
+        
+        // Connect to project channel for realtime updates
+        if (parsedProject.id) {
+          webSocketService.connectToProject(parsedProject.id);
+        }
       } catch (error) {
         console.error('Failed to load project from localStorage', error);
       }
@@ -182,6 +196,15 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
       payload: webSocketService.getLocalUserId() 
     });
     
+    // Check for saved username in local storage
+    const savedUserName = localStorage.getItem('userName');
+    if (savedUserName) {
+      dispatch({
+        type: 'UPDATE_SETTINGS',
+        payload: { userName: savedUserName }
+      });
+    }
+    
     // Load history
     const history = webSocketService.getMessageHistory();
     history.forEach(message => {
@@ -194,17 +217,434 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
         }
       });
     });
+    
+    // Cleanup
+    return () => {
+      webSocketService.disconnectFromProject();
+    };
+  }, [webSocketService]);
+  
+  // Update username when changed
+  const updateUserName = useCallback((name: string) => {
+    if (name && name.trim()) {
+      webSocketService.setLocalUserName(name);
+      
+      dispatch({
+        type: 'UPDATE_SETTINGS',
+        payload: { userName: name }
+      });
+      
+      toast({
+        title: "Username updated",
+        description: `Your name is now set to "${name}"`,
+      });
+    }
+  }, [webSocketService]);
+  
+  // Function to get project data from Supabase
+  const getProjectFromSupabase = useCallback(async (projectId: string) => {
+    try {
+      // Get the project
+      const { data: projectData, error: projectError } = await supabase
+        .from('projects')
+        .select('*')
+        .eq('id', projectId)
+        .single();
+      
+      if (projectError) throw projectError;
+      
+      if (!projectData) {
+        toast({
+          title: "Project not found",
+          description: "The requested project could not be found.",
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      // Get the tracks
+      const { data: tracksData, error: tracksError } = await supabase
+        .from('tracks')
+        .select('*')
+        .eq('project_id', projectId);
+      
+      if (tracksError) throw tracksError;
+      
+      // Get the audio blocks
+      const { data: blocksData, error: blocksError } = await supabase
+        .from('audio_blocks')
+        .select('*')
+        .eq('project_id', projectId);
+      
+      if (blocksError) throw blocksError;
+      
+      // Transform the data into our state format
+      const tracks: Record<string, TrackInfo> = {};
+      tracksData?.forEach(track => {
+        tracks[track.id] = {
+          id: track.id,
+          name: track.name,
+          color: track.color,
+          volume: track.volume,
+          muted: track.muted,
+          solo: track.solo,
+          armed: track.armed,
+          locked: track.locked,
+          lockedByUser: track.locked_by_user_id,
+          lockedByUserName: track.locked_by_name
+        };
+      });
+      
+      const blocks: Record<string, BlockInfo> = {};
+      blocksData?.forEach(block => {
+        blocks[block.id] = {
+          id: block.id,
+          name: block.name,
+          trackId: block.track_id,
+          startBeat: block.start_beat,
+          lengthBeats: block.length_beats,
+          volume: block.volume,
+          pitch: block.pitch,
+          fileId: block.file_id
+        };
+      });
+      
+      // Create a new project state
+      const newProject: ProjectState = {
+        id: projectData.id,
+        name: projectData.name,
+        bpm: projectData.bpm,
+        masterVolume: projectData.master_volume,
+        settings: projectData.settings,
+        tracks,
+        blocks,
+        markers: {},
+        assets: {},
+        users: {},
+        history: [],
+        localUserId: webSocketService.getLocalUserId()
+      };
+      
+      // Update the state
+      dispatch({ type: 'SET_PROJECT', payload: newProject });
+      
+      // Save to local storage
+      localStorage.setItem('currentProject', JSON.stringify(newProject));
+      
+      // Connect to the project channel
+      webSocketService.connectToProject(projectId);
+      
+      toast({
+        title: "Project loaded",
+        description: `Project "${projectData.name}" has been loaded.`,
+      });
+    } catch (error) {
+      console.error('Error loading project from Supabase:', error);
+      toast({
+        title: "Error loading project",
+        description: "There was an error loading the project. Please try again.",
+        variant: "destructive",
+      });
+    }
+  }, [webSocketService]);
+  
+  // Function to save project to Supabase
+  const saveProjectToSupabase = useCallback(async () => {
+    if (!state.id) return;
+    
+    try {
+      // Save the project
+      const { error: projectError } = await supabase
+        .from('projects')
+        .upsert({
+          id: state.id,
+          name: state.name,
+          bpm: state.bpm,
+          master_volume: state.masterVolume,
+          settings: state.settings,
+          updated_at: new Date().toISOString()
+        });
+      
+      if (projectError) throw projectError;
+      
+      // Save all tracks
+      const trackPromises = Object.values(state.tracks).map(track => {
+        return supabase
+          .from('tracks')
+          .upsert({
+            id: track.id,
+            project_id: state.id,
+            name: track.name,
+            color: track.color,
+            volume: track.volume,
+            muted: track.muted,
+            solo: track.solo,
+            armed: track.armed || false,
+            locked: track.locked || false,
+            locked_by_user_id: track.lockedByUser || null,
+            locked_by_name: track.lockedByUserName || null,
+            updated_at: new Date().toISOString()
+          });
+      });
+      
+      await Promise.all(trackPromises);
+      
+      // Save all blocks
+      const blockPromises = Object.values(state.blocks).map(block => {
+        return supabase
+          .from('audio_blocks')
+          .upsert({
+            id: block.id,
+            project_id: state.id,
+            track_id: block.trackId,
+            name: block.name,
+            start_beat: block.startBeat,
+            length_beats: block.lengthBeats,
+            volume: block.volume,
+            pitch: block.pitch,
+            file_id: block.fileId || null,
+            updated_at: new Date().toISOString()
+          });
+      });
+      
+      await Promise.all(blockPromises);
+      
+      toast({
+        title: "Project saved",
+        description: "Your project has been saved to the database.",
+      });
+    } catch (error) {
+      console.error('Error saving project to Supabase:', error);
+      toast({
+        title: "Error saving project",
+        description: "There was an error saving the project. Please try again.",
+        variant: "destructive",
+      });
+    }
+  }, [state]);
+  
+  // Function to create a new project
+  const createNewProject = useCallback(async (name: string, bpm: number): Promise<string> => {
+    try {
+      // Create the project in Supabase
+      const { data: projectData, error: projectError } = await supabase
+        .from('projects')
+        .insert({
+          name,
+          bpm,
+          settings: {
+            snapToGrid: true,
+            gridSize: 1,
+            autoSave: true,
+            showCollaborators: true,
+            theme: 'dark',
+            userName: webSocketService.getLocalUserName()
+          }
+        })
+        .select()
+        .single();
+      
+      if (projectError) throw projectError;
+      
+      // Create a new project state
+      const newProject: ProjectState = {
+        id: projectData.id,
+        name: projectData.name,
+        bpm: projectData.bpm,
+        masterVolume: projectData.master_volume || 80,
+        settings: projectData.settings,
+        tracks: {},
+        blocks: {},
+        markers: {},
+        assets: {},
+        users: {},
+        history: [],
+        localUserId: webSocketService.getLocalUserId()
+      };
+      
+      // Update the state
+      dispatch({ type: 'SET_PROJECT', payload: newProject });
+      
+      // Save to local storage
+      localStorage.setItem('currentProject', JSON.stringify(newProject));
+      
+      // Connect to the project channel
+      webSocketService.connectToProject(projectData.id);
+      
+      toast({
+        title: "Project created",
+        description: `Project "${name}" has been created.`,
+      });
+      
+      return projectData.id;
+    } catch (error) {
+      console.error('Error creating project in Supabase:', error);
+      toast({
+        title: "Error creating project",
+        description: "There was an error creating the project. Please try again.",
+        variant: "destructive",
+      });
+      return '';
+    }
   }, [webSocketService]);
   
   // Save project to localStorage when it changes
   useEffect(() => {
     if (state.id) {
       localStorage.setItem('currentProject', JSON.stringify(state));
+      
+      // If autoSave is enabled, also save to Supabase
+      if (state.settings.autoSave) {
+        saveProjectToSupabase();
+      }
     }
-  }, [state]);
+  }, [state, saveProjectToSupabase]);
   
-  // WebSocket event listeners
+  // WebSocket event handlers for realtime updates
   useEffect(() => {
+    // Handle cursor movements from other users
+    const handleCursorMove = (data: any) => {
+      setCurrentUsers(prev => ({
+        ...prev,
+        [data.userId]: {
+          userName: data.userName,
+          x: data.x,
+          y: data.y
+        }
+      }));
+    };
+    
+    // Handle user presence syncing
+    const handlePresenceSync = (state: any) => {
+      const users: Record<string, any> = {};
+      Object.keys(state).forEach(key => {
+        const userPresence = state[key][0];
+        if (userPresence && userPresence.userId !== webSocketService.getLocalUserId()) {
+          users[userPresence.userId] = {
+            userName: userPresence.userName,
+            x: 0,
+            y: 0
+          };
+        }
+      });
+      
+      setCurrentUsers(users);
+    };
+    
+    // Handle user joining
+    const handlePresenceJoin = ({ newPresences }: any) => {
+      if (newPresences && newPresences.length > 0) {
+        const userPresence = newPresences[0];
+        if (userPresence.userId !== webSocketService.getLocalUserId()) {
+          toast({
+            title: "User joined",
+            description: `${userPresence.userName} joined the project.`,
+          });
+        }
+      }
+    };
+    
+    // Handle user leaving
+    const handlePresenceLeave = ({ leftPresences }: any) => {
+      if (leftPresences && leftPresences.length > 0) {
+        const userPresence = leftPresences[0];
+        setCurrentUsers(prev => {
+          const newUsers = { ...prev };
+          delete newUsers[userPresence.userId];
+          return newUsers;
+        });
+        
+        toast({
+          title: "User left",
+          description: `${userPresence.userName} left the project.`,
+        });
+      }
+    };
+    
+    // Register event listeners for cursor movement and presence
+    webSocketService.on('cursorMove', handleCursorMove);
+    webSocketService.on('presenceSync', handlePresenceSync);
+    webSocketService.on('presenceJoin', handlePresenceJoin);
+    webSocketService.on('presenceLeave', handlePresenceLeave);
+    
+    // Register Supabase event listeners for realtime updates
+    const tracksChannel = supabase
+      .channel('tracks-changes')
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'tracks'
+      }, payload => {
+        const track = payload.new as any;
+        
+        // Ignore our own updates
+        if (track.locked_by_user_id === webSocketService.getLocalUserId()) {
+          return;
+        }
+        
+        // Update the track in our state
+        const updatedTrack: TrackInfo = {
+          id: track.id,
+          name: track.name,
+          color: track.color,
+          volume: track.volume,
+          muted: track.muted,
+          solo: track.solo,
+          armed: track.armed,
+          locked: track.locked,
+          lockedByUser: track.locked_by_user_id,
+          lockedByUserName: track.locked_by_name
+        };
+        
+        dispatch({
+          type: 'UPDATE_TRACKS',
+          payload: { [track.id]: updatedTrack }
+        });
+        
+        // Show toast if track was locked/unlocked by another user
+        if (track.locked && track.locked_by_user_id) {
+          toast({
+            title: "Track locked",
+            description: `"${track.name}" is now locked by ${track.locked_by_name}.`,
+          });
+        } else if (payload.old && (payload.old as any).locked && !track.locked) {
+          toast({
+            title: "Track unlocked",
+            description: `"${track.name}" is now unlocked.`,
+          });
+        }
+      })
+      .subscribe();
+    
+    const blocksChannel = supabase
+      .channel('blocks-changes')
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'audio_blocks'
+      }, payload => {
+        const block = payload.new as any;
+        
+        // Update the block in our state
+        const updatedBlock: BlockInfo = {
+          id: block.id,
+          name: block.name,
+          trackId: block.track_id,
+          startBeat: block.start_beat,
+          lengthBeats: block.length_beats,
+          volume: block.volume,
+          pitch: block.pitch,
+          fileId: block.file_id
+        };
+        
+        dispatch({
+          type: 'UPDATE_BLOCKS',
+          payload: { [block.id]: updatedBlock }
+        });
+      })
+      .subscribe();
+    
+    // Handle WebSocket messages
     const handleMessage = (message: UserInteractionMessage) => {
       // Add to history
       dispatch({
@@ -232,6 +672,57 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
           }
           break;
         
+        // Handle track locking
+        case ActionType.LOCK_TRACK:
+          if (message.params.trackId) {
+            const { trackId, userId, userName } = message.params;
+            const updatedTrack = {
+              ...state.tracks[trackId],
+              locked: true,
+              lockedByUser: userId,
+              lockedByUserName: userName
+            };
+            dispatch({
+              type: 'UPDATE_TRACKS',
+              payload: { [trackId]: updatedTrack }
+            });
+            
+            // Show toast if locked by another user
+            if (userId !== webSocketService.getLocalUserId()) {
+              toast({
+                title: "Track locked",
+                description: `"${updatedTrack.name}" is now locked by ${userName}.`,
+              });
+            }
+          }
+          break;
+        
+        // Handle track unlocking
+        case ActionType.UNLOCK_TRACK:
+          if (message.params.trackId) {
+            const { trackId } = message.params;
+            const updatedTrack = {
+              ...state.tracks[trackId],
+              locked: false,
+              lockedByUser: undefined,
+              lockedByUserName: undefined
+            };
+            dispatch({
+              type: 'UPDATE_TRACKS',
+              payload: { [trackId]: updatedTrack }
+            });
+            
+            // Show toast if unlocked by another user
+            if (message.userId !== webSocketService.getLocalUserId()) {
+              toast({
+                title: "Track unlocked",
+                description: `"${updatedTrack.name}" is now unlocked.`,
+              });
+            }
+          }
+          break;
+        
+        // ... keep existing code (other action handling)
         case ActionType.ADD_TRACK:
           if (message.params.track) {
             const newTrack = message.params.track as TrackInfo;
@@ -334,8 +825,6 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
         case ActionType.UPDATE_SETTINGS:
           dispatch({ type: 'UPDATE_SETTINGS', payload: message.params });
           break;
-        
-        // Handle other actions as needed
       }
     };
     
@@ -351,6 +840,12 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     return () => {
       webSocketService.off('message', handleMessage);
       webSocketService.off('rollback', handleRollback);
+      webSocketService.off('cursorMove', handleCursorMove);
+      webSocketService.off('presenceSync', handlePresenceSync);
+      webSocketService.off('presenceJoin', handlePresenceJoin);
+      webSocketService.off('presenceLeave', handlePresenceLeave);
+      supabase.removeChannel(tracksChannel);
+      supabase.removeChannel(blocksChannel);
     };
   }, [state, webSocketService]);
   
@@ -358,6 +853,74 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const sendMessage = useCallback((action: ActionType, params: any, filePayload?: FilePayload): string => {
     return webSocketService.sendMessage(action, params, filePayload);
   }, [webSocketService]);
+  
+  // Function to lock a track
+  const lockTrack = useCallback((trackId: string) => {
+    if (state.tracks[trackId].locked) {
+      toast({
+        title: "Track already locked",
+        description: `"${state.tracks[trackId].name}" is already locked by ${state.tracks[trackId].lockedByUserName || 'someone else'}.`,
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    webSocketService.lockTrack(trackId);
+    
+    // Update local state immediately
+    const updatedTrack = {
+      ...state.tracks[trackId],
+      locked: true,
+      lockedByUser: webSocketService.getLocalUserId(),
+      lockedByUserName: webSocketService.getLocalUserName()
+    };
+    
+    dispatch({
+      type: 'UPDATE_TRACKS',
+      payload: { [trackId]: updatedTrack }
+    });
+    
+    toast({
+      title: "Track locked",
+      description: `You have locked "${state.tracks[trackId].name}".`,
+    });
+  }, [state.tracks, webSocketService]);
+  
+  // Function to unlock a track
+  const unlockTrack = useCallback((trackId: string) => {
+    // Only allow unlocking if the user is the one who locked it
+    if (
+      state.tracks[trackId].locked && 
+      state.tracks[trackId].lockedByUser !== webSocketService.getLocalUserId()
+    ) {
+      toast({
+        title: "Cannot unlock track",
+        description: `This track is locked by ${state.tracks[trackId].lockedByUserName || 'someone else'}.`,
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    webSocketService.unlockTrack(trackId);
+    
+    // Update local state immediately
+    const updatedTrack = {
+      ...state.tracks[trackId],
+      locked: false,
+      lockedByUser: undefined,
+      lockedByUserName: undefined
+    };
+    
+    dispatch({
+      type: 'UPDATE_TRACKS',
+      payload: { [trackId]: updatedTrack }
+    });
+    
+    toast({
+      title: "Track unlocked",
+      description: `You have unlocked "${state.tracks[trackId].name}".`,
+    });
+  }, [state.tracks, webSocketService]);
   
   // Function to upload a file
   const uploadFile = useCallback(async (file: File, onProgress?: (progress: number) => void): Promise<string> => {
@@ -436,6 +999,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     setHistoryVisible(false);
   }, []);
   
+  // Create context value
   const value = {
     state,
     dispatch,
@@ -445,12 +1009,59 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     setHistoryVisible,
     restoreToTimestamp,
     selectedHistoryIndex,
-    setSelectedHistoryIndex
+    setSelectedHistoryIndex,
+    lockTrack,
+    unlockTrack,
+    updateUserName,
+    getProjectFromSupabase,
+    saveProjectToSupabase,
+    createNewProject
   };
   
+  // Render providers
   return (
     <ProjectContext.Provider value={value}>
       {children}
+      
+      {/* Render remote user cursors */}
+      {state.settings.showCollaborators && Object.entries(currentUsers).map(([userId, user]) => (
+        <div 
+          key={userId}
+          className="remote-cursor"
+          style={{
+            position: 'absolute',
+            left: `${user.x}px`,
+            top: `${user.y}px`,
+            zIndex: 9999,
+            pointerEvents: 'none'
+          }}
+        >
+          <div 
+            style={{
+              width: '16px',
+              height: '16px',
+              borderRadius: '50%',
+              backgroundColor: '#60A5FA',
+              transform: 'translate(-50%, -50%)'
+            }}
+          />
+          <div 
+            style={{
+              position: 'absolute',
+              top: '-24px',
+              left: '8px',
+              backgroundColor: '#60A5FA',
+              color: 'white',
+              padding: '2px 6px',
+              borderRadius: '4px',
+              fontSize: '12px',
+              whiteSpace: 'nowrap'
+            }}
+          >
+            {user.userName}
+          </div>
+        </div>
+      ))}
     </ProjectContext.Provider>
   );
 };

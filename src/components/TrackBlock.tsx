@@ -1,5 +1,6 @@
 
 import React, { useState, useRef, useEffect } from 'react';
+import { Lock } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
 import { ui } from '@/styles/ui-classes';
@@ -19,7 +20,10 @@ export interface TrackBlockProps {
   trackHeight: number;
   editingUserId?: string | null;
   isTrackLocked?: boolean;
+  lockedByUser?: string;
+  lockedByUserName?: string;
   activeTool?: 'select' | 'pan' | 'boxSelect';
+  localUserId?: string;
 }
 
 const TrackBlock: React.FC<TrackBlockProps> = ({
@@ -28,6 +32,7 @@ const TrackBlock: React.FC<TrackBlockProps> = ({
   startBeat,
   lengthBeats,
   name,
+  color = '#60A5FA', // provide default color
   selected,
   onSelect,
   onPositionChange,
@@ -36,7 +41,10 @@ const TrackBlock: React.FC<TrackBlockProps> = ({
   trackHeight,
   editingUserId,
   isTrackLocked,
-  activeTool = 'select'
+  lockedByUser,
+  lockedByUserName,
+  activeTool = 'select',
+  localUserId
 }) => {
   const [isDragging, setIsDragging] = useState(false);
   const [isResizing, setIsResizing] = useState(false);
@@ -46,6 +54,8 @@ const TrackBlock: React.FC<TrackBlockProps> = ({
   const blockRef = useRef<HTMLDivElement>(null);
   
   const [waveformPattern, setWaveformPattern] = useState<number[]>([]);
+  
+  const isTrackLockedByOtherUser = isTrackLocked && lockedByUser !== localUserId;
   
   useEffect(() => {
     const pattern = Array.from({ length: 30 }, () => 
@@ -57,7 +67,7 @@ const TrackBlock: React.FC<TrackBlockProps> = ({
   const handleMouseDown = (e: React.MouseEvent) => {
     e.stopPropagation();
     
-    if (isTrackLocked || activeTool !== 'select') {
+    if (isTrackLockedByOtherUser || activeTool !== 'select') {
       return;
     }
     
@@ -83,7 +93,14 @@ const TrackBlock: React.FC<TrackBlockProps> = ({
   };
   
   const handleResizeMouseDown = (e: React.MouseEvent) => {
-    if (isTrackLocked || activeTool !== 'select') {
+    if (isTrackLockedByOtherUser || activeTool !== 'select') {
+      if (isTrackLockedByOtherUser) {
+        toast({
+          title: "Cannot resize block",
+          description: `This track is locked by ${lockedByUserName || 'another user'}.`,
+          variant: "destructive",
+        });
+      }
       return;
     }
     
@@ -97,7 +114,7 @@ const TrackBlock: React.FC<TrackBlockProps> = ({
   };
   
   const handleMouseMove = (e: MouseEvent) => {
-    if (!isDragging || !blockRef.current || isTrackLocked) return;
+    if (!isDragging || !blockRef.current || isTrackLockedByOtherUser) return;
     
     const container = blockRef.current.parentElement;
     if (!container) return;
@@ -119,7 +136,7 @@ const TrackBlock: React.FC<TrackBlockProps> = ({
   };
   
   const handleResizeMouseMove = (e: MouseEvent) => {
-    if (!isResizing || !blockRef.current || isTrackLocked) return;
+    if (!isResizing || !blockRef.current || isTrackLockedByOtherUser) return;
     
     const container = blockRef.current.parentElement;
     if (!container) return;
@@ -166,7 +183,7 @@ const TrackBlock: React.FC<TrackBlockProps> = ({
     return colors[hash % colors.length];
   };
 
-  const canInteract = activeTool === 'select' && !isTrackLocked;
+  const canInteract = activeTool === 'select' && !isTrackLockedByOtherUser;
   
   return (
     <div
@@ -176,13 +193,13 @@ const TrackBlock: React.FC<TrackBlockProps> = ({
         selected ? ui.trackBlock.selected : ui.trackBlock.notSelected,
         isDragging ? ui.trackBlock.dragging : "",
         editingUserId && !selected ? `ring-2 ring-offset-1` : "",
-        isTrackLocked ? ui.trackBlock.locked : canInteract ? ui.trackBlock.movable : "cursor-default"
+        isTrackLockedByOtherUser ? ui.trackBlock.locked : canInteract ? ui.trackBlock.movable : "cursor-default"
       )}
       style={blockStyle}
       onMouseDown={handleMouseDown}
       onClick={(e) => {
         e.stopPropagation();
-        if (!isTrackLocked && activeTool === 'select' && !isResizing) {
+        if (!isTrackLockedByOtherUser && activeTool === 'select' && !isResizing) {
           onSelect(id);
         }
       }}
@@ -205,6 +222,15 @@ const TrackBlock: React.FC<TrackBlockProps> = ({
         </div>
       </div>
       
+      {isTrackLockedByOtherUser && (
+        <div 
+          className="absolute top-1 right-1 flex items-center text-red-500"
+          title={`Locked by ${lockedByUserName || 'another user'}`}
+        >
+          <Lock className="h-3 w-3" />
+        </div>
+      )}
+      
       {editingUserId && (
         <div 
           className="absolute -top-2 -right-2 w-4 h-4 rounded-full z-30"
@@ -222,10 +248,12 @@ const TrackBlock: React.FC<TrackBlockProps> = ({
         />
       )}
       
-      <div 
-        className={ui.trackBlock.resizeHandle}
-        onMouseDown={handleResizeMouseDown}
-      />
+      {canInteract && (
+        <div 
+          className={ui.trackBlock.resizeHandle}
+          onMouseDown={handleResizeMouseDown}
+        />
+      )}
     </div>
   );
 };

@@ -9,6 +9,59 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      audio_blocks: {
+        Row: {
+          audio_url: string | null
+          created_at: string
+          duration: number
+          id: string
+          name: string
+          pitch: number
+          start_time: number
+          track_id: string
+          updated_at: string
+          version: number
+          volume: number
+          waveform_data: Json | null
+        }
+        Insert: {
+          audio_url?: string | null
+          created_at?: string
+          duration: number
+          id?: string
+          name: string
+          pitch?: number
+          start_time: number
+          track_id: string
+          updated_at?: string
+          version?: number
+          volume?: number
+          waveform_data?: Json | null
+        }
+        Update: {
+          audio_url?: string | null
+          created_at?: string
+          duration?: number
+          id?: string
+          name?: string
+          pitch?: number
+          start_time?: number
+          track_id?: string
+          updated_at?: string
+          version?: number
+          volume?: number
+          waveform_data?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "audio_blocks_track_id_fkey"
+            columns: ["track_id"]
+            isOneToOne: false
+            referencedRelation: "tracks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       characters: {
         Row: {
           alternate_greetings: string[] | null
@@ -120,6 +173,101 @@ export type Database = {
           },
         ]
       }
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          created_at: string | null
+          email: string | null
+          id: string
+          name: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string | null
+          email?: string | null
+          id: string
+          name?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string | null
+          email?: string | null
+          id?: string
+          name?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      project_settings: {
+        Row: {
+          bit_depth: number
+          bpm: number
+          created_at: string | null
+          id: string
+          project_id: string
+          sample_rate: number
+          time_signature: string
+          updated_at: string | null
+        }
+        Insert: {
+          bit_depth?: number
+          bpm?: number
+          created_at?: string | null
+          id?: string
+          project_id: string
+          sample_rate?: number
+          time_signature?: string
+          updated_at?: string | null
+        }
+        Update: {
+          bit_depth?: number
+          bpm?: number
+          created_at?: string | null
+          id?: string
+          project_id?: string
+          sample_rate?: number
+          time_signature?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_settings_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: true
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      projects: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          tracks: string[] | null
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          tracks?: string[] | null
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          tracks?: string[] | null
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       scenes: {
         Row: {
           chapter_number: number
@@ -203,6 +351,171 @@ export type Database = {
         }
         Relationships: []
       }
+      tracks: {
+        Row: {
+          color: string
+          created_at: string
+          id: string
+          muted: boolean
+          name: string
+          project_id: string
+          solo: boolean
+          updated_at: string
+          volume: number
+        }
+        Insert: {
+          color: string
+          created_at?: string
+          id?: string
+          muted?: boolean
+          name: string
+          project_id: string
+          solo?: boolean
+          updated_at?: string
+          volume?: number
+        }
+        Update: {
+          color?: string
+          created_at?: string
+          id?: string
+          muted?: boolean
+          name?: string
+          project_id?: string
+          solo?: boolean
+          updated_at?: string
+          volume?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tracks_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_presence: {
+        Row: {
+          cursor_position: Json | null
+          id: string
+          last_active: string
+          locked_blocks: Json | null
+          project_id: string
+          user_id: string
+        }
+        Insert: {
+          cursor_position?: Json | null
+          id?: string
+          last_active?: string
+          locked_blocks?: Json | null
+          project_id: string
+          user_id: string
+        }
+        Update: {
+          cursor_position?: Json | null
+          id?: string
+          last_active?: string
+          locked_blocks?: Json | null
+          project_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_presence_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_settings: {
+        Row: {
+          created_at: string | null
+          id: string
+          theme: string
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          theme?: string
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          theme?: string
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      users: {
+        Row: {
+          avatar_url: string | null
+          created_at: string
+          email: string
+          id: string
+          name: string | null
+          updated_at: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string
+          email: string
+          id?: string
+          name?: string | null
+          updated_at?: string
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string
+          email?: string
+          id?: string
+          name?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      websocket_messages: {
+        Row: {
+          created_at: string | null
+          id: string
+          message_type: string
+          payload: Json
+          project_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          message_type: string
+          payload: Json
+          project_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          message_type?: string
+          payload?: Json
+          project_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "websocket_messages_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -216,9 +529,17 @@ export type Database = {
         Args: { "": unknown }
         Returns: string[]
       }
+      create_demo_user: {
+        Args: { username: string; password_hash: string }
+        Returns: string
+      }
       each: {
         Args: { hs: unknown }
         Returns: Record<string, unknown>[]
+      }
+      execute_safe_sql: {
+        Args: { sql_string: string }
+        Returns: string
       }
       ghstore_compress: {
         Args: { "": unknown }
@@ -239,6 +560,10 @@ export type Database = {
       ghstore_out: {
         Args: { "": unknown }
         Returns: unknown
+      }
+      google_id_to_uuid: {
+        Args: { google_id: string }
+        Returns: string
       }
       hstore: {
         Args: { "": string[] } | { "": Record<string, unknown> }
@@ -295,6 +620,18 @@ export type Database = {
       hstore_version_diag: {
         Args: { "": unknown }
         Returns: number
+      }
+      is_valid_uuid: {
+        Args: { str: string }
+        Returns: boolean
+      }
+      safe_create_schema: {
+        Args: { schema_name: string }
+        Returns: string
+      }
+      safe_create_table: {
+        Args: { schema_name: string; table_name: string; table_def: string }
+        Returns: string
       }
       skeys: {
         Args: { "": unknown }

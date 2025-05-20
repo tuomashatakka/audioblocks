@@ -27,4 +27,10 @@ export const ui = {
     fullScreen: "flex flex-col h-screen overflow-hidden bg-background text-foreground",
     growContainer: "flex-grow relative overflow-auto",
   },
+  collaboration: {
+    remoteCursor: "absolute pointer-events-none z-50",
+    cursorDot: "w-4 h-4 bg-blue-500 rounded-full transform -translate-x-1/2 -translate-y-1/2",
+    nameTag: "absolute left-2 top-2 px-2 py-1 text-xs font-medium bg-blue-500 text-white rounded whitespace-nowrap",
+    lockedBy: "inline-flex items-center text-xs text-red-500",
+  },
 };

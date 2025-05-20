@@ -14,6 +14,8 @@ export enum ActionType {
   SOLO_TRACK = "SOLO_TRACK",
   ARM_TRACK = "ARM_TRACK",
   SET_TRACK_VOLUME = "SET_TRACK_VOLUME",
+  LOCK_TRACK = "LOCK_TRACK",
+  UNLOCK_TRACK = "UNLOCK_TRACK",
   
   // Block/clip actions
   ADD_BLOCK = "ADD_BLOCK",
@@ -159,6 +161,7 @@ export interface TrackInfo {
   armed?: boolean;
   locked?: boolean;
   lockedByUser?: string;
+  lockedByUserName?: string;
 }
 
 export interface BlockInfo {
@@ -206,4 +209,5 @@ export interface ProjectSettings {
   autoSave: boolean;
   showCollaborators: boolean;
   theme: 'dark' | 'light';
+  userName?: string;
 }

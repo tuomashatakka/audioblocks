@@ -9,6 +9,7 @@ export const ui = {
     primary: "bg-primary text-primary-foreground hover:bg-primary/90",
     secondary: "bg-secondary text-secondary-foreground hover:bg-secondary/80",
     ghost: "hover:bg-accent hover:text-accent-foreground",
+    transport: "flex items-center justify-center h-10 w-10 rounded-full bg-secondary hover:bg-secondary/70 transition-all active:scale-95",
   },
   trackBlock: {
     base: "track-block absolute rounded-sm border-2 overflow-hidden backdrop-blur-sm bg-black/30",
@@ -33,4 +34,35 @@ export const ui = {
     nameTag: "absolute left-2 top-2 px-2 py-1 text-xs font-medium bg-blue-500 text-white rounded whitespace-nowrap",
     lockedBy: "inline-flex items-center text-xs text-red-500",
   },
+  contextMenu: {
+    container: "backdrop-blur-md bg-popover/90 border border-border shadow-xl animate-in fade-in zoom-in-95",
+    item: "flex items-center px-2 py-1.5 text-sm cursor-default hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground",
+    subTrigger: "flex items-center px-2 py-1.5 text-sm cursor-default hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground",
+    subContent: "backdrop-blur-md bg-popover/90 border border-border shadow-xl rounded-md min-w-[8rem]",
+  },
+  mixer: {
+    channel: "flex flex-col h-full bg-muted/30 border-r border-border",
+    fader: "w-full h-32 cursor-ns-resize",
+    knob: "w-8 h-8 rounded-full bg-secondary cursor-pointer hover:bg-accent transition-colors",
+    meter: "w-2 h-full bg-gradient-to-t from-primary/30 to-primary",
+  },
+  transport: {
+    container: "flex items-center space-x-2 px-4 py-2 bg-secondary/80 border-b border-border z-10 backdrop-blur-md",
+    button: "h-9 w-9 rounded-full flex items-center justify-center hover:bg-accent transition-colors",
+    timeDisplay: "font-mono text-sm bg-muted/50 px-2 py-1 rounded border border-border",
+    slider: "h-1 w-full bg-muted rounded-full overflow-hidden",
+    sliderThumb: "h-4 w-4 rounded-full bg-primary border-2 border-background absolute top-1/2 transform -translate-y-1/2 -translate-x-1/2",
+  },
+  panels: {
+    resizer: "w-2 cursor-col-resize bg-transparent hover:bg-primary/20 transition-colors",
+    header: "py-2 px-3 flex items-center justify-between bg-secondary/80 border-b border-border",
+    container: "flex flex-col h-full overflow-hidden bg-background/50 backdrop-blur-sm",
+  },
+  timeline: {
+    marker: "absolute h-full w-px bg-primary/50 cursor-pointer",
+    markerLabel: "absolute bottom-1 left-1/2 transform -translate-x-1/2 bg-muted text-xs px-1 py-0.5 rounded whitespace-nowrap",
+    beat: "absolute h-full w-px bg-muted/30",
+    bar: "absolute h-full w-px bg-muted/50",
+    playhead: "absolute h-full w-px bg-primary/80 z-50 shadow-glow-sm",
+  }
 };

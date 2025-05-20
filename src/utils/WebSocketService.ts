@@ -59,6 +59,21 @@ class WebSocketService extends EventEmitter {
     localStorage.setItem('userName', name);
   }
 
+  public updateUserName(userName: string): void {
+    this.localUserName = userName;
+    
+    // If connected to a project, broadcast the name change
+    if (this.currentProjectId) {
+      this.sendMessage(ActionType.USER_JOINED, {
+        userName: this.localUserName,
+        userId: this.localUserId
+      });
+    }
+    
+    // Store in local storage
+    localStorage.setItem('userName', userName);
+  }
+
   public getMessageHistory(): UserInteractionMessage[] {
     return this.messageQueue;
   }

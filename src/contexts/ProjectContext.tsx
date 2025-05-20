@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import WebSocketService from '@/utils/WebSocketService';
-import { ActionType, UserInteractionMessage } from '@/types/collaborative';
+import { ActionType, UserInteractionMessage, ProjectHistoryEntry } from '@/types/collaborative';
 
 interface ProjectState {
   localUserId: string;
@@ -14,6 +14,16 @@ interface ProjectState {
     color: string;
     position: { x: number; y: number };
   }[];
+  settings?: {
+    theme: 'light' | 'dark';
+    snapToGrid: boolean;
+    gridSize: number;
+    autoSave: boolean;
+    showCollaborators: boolean;
+    userName?: string;
+    [key: string]: string | number | boolean | undefined;
+  };
+  history: ProjectHistoryEntry[];
 }
 
 interface ProjectSettings {
@@ -22,7 +32,8 @@ interface ProjectSettings {
   gridSize: number;
   autoSave: boolean;
   showCollaborators: boolean;
-  [key: string]: string | number | boolean; // Index signature to allow additional properties
+  userName?: string;
+  [key: string]: string | number | boolean | undefined; // Index signature to allow additional properties
 }
 
 interface ProjectContextType {
@@ -34,6 +45,10 @@ interface ProjectContextType {
   historyVisible: boolean;
   setHistoryVisible: (visible: boolean) => void;
   updateProjectSettings: (settings: Partial<ProjectSettings>) => Promise<void>;
+  selectedHistoryIndex: number | null;
+  setSelectedHistoryIndex: (index: number | null) => void;
+  restoreToTimestamp: (timestamp: number) => void;
+  updateUserName: (name: string) => void;
 }
 
 const ProjectContext = createContext<ProjectContextType | undefined>(undefined);
@@ -266,10 +281,20 @@ export const ProjectProvider = ({ children }: ProjectProviderProps) => {
     localUserName: webSocketService.getLocalUserName(),
     projectId: null,
     isConnected: false,
-    collaborators: []
+    collaborators: [],
+    settings: {
+      theme: 'dark',
+      snapToGrid: true,
+      gridSize: 1,
+      autoSave: true,
+      showCollaborators: true,
+      userName: 'User'
+    },
+    history: []
   });
   
   const [historyVisible, setHistoryVisible] = useState(false);
+  const [selectedHistoryIndex, setSelectedHistoryIndex] = useState<number | null>(null);
   
   useEffect(() => {
     const handleConnected = (data: { userId: string, projectId: string }) => {
@@ -339,7 +364,8 @@ export const ProjectProvider = ({ children }: ProjectProviderProps) => {
       
       setState(prev => ({
         ...prev,
-        projectId
+        projectId,
+        history: webSocketService.getMessageHistory() as ProjectHistoryEntry[]
       }));
     } catch (error) {
       console.error("Failed to connect to project:", error);
@@ -353,7 +379,8 @@ export const ProjectProvider = ({ children }: ProjectProviderProps) => {
       ...prev,
       projectId: null,
       isConnected: false,
-      collaborators: []
+      collaborators: [],
+      history: []
     }));
   };
   
@@ -369,9 +396,52 @@ export const ProjectProvider = ({ children }: ProjectProviderProps) => {
     try {
       await updateSettings(state.projectId, settings as ProjectSettings);
       sendMessage(ActionType.UPDATE_SETTINGS, { settings });
+      
+      setState(prev => ({
+        ...prev,
+        settings: {
+          ...prev.settings || {},
+          ...settings
+        }
+      }));
     } catch (error) {
       console.error("Failed to update project settings:", error);
       throw error;
+    }
+  };
+  
+  const restoreToTimestamp = (timestamp: number) => {
+    if (!state.projectId) return;
+    
+    // Implementation to restore project state to a specific point in history
+    console.log(`Restoring project state to timestamp: ${timestamp}`);
+    
+    // In a real implementation, we would send a message to the server
+    // to restore the project state to the specified timestamp
+    sendMessage(ActionType.RESTORE_TO_TIMESTAMP, { timestamp });
+    
+    // Close the history drawer
+    setHistoryVisible(false);
+    setSelectedHistoryIndex(null);
+  };
+  
+  const updateUserName = (userName: string) => {
+    // Update user name in settings
+    setState(prev => ({
+      ...prev,
+      localUserName: userName,
+      settings: {
+        ...prev.settings || {},
+        userName
+      }
+    }));
+    
+    // Update the user name in the WebSocket service
+    webSocketService.updateUserName(userName);
+    
+    // Save to project settings if connected to a project
+    if (state.projectId) {
+      updateProjectSettings({ userName });
     }
   };
   
@@ -385,7 +455,11 @@ export const ProjectProvider = ({ children }: ProjectProviderProps) => {
         messageHistory: webSocketService.getMessageHistory(),
         historyVisible,
         setHistoryVisible,
-        updateProjectSettings
+        updateProjectSettings,
+        selectedHistoryIndex,
+        setSelectedHistoryIndex,
+        restoreToTimestamp,
+        updateUserName
       }}
     >
       {children}

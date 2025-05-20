@@ -16,6 +16,7 @@ export enum ActionType {
   SET_TRACK_VOLUME = "SET_TRACK_VOLUME",
   LOCK_TRACK = "LOCK_TRACK",
   UNLOCK_TRACK = "UNLOCK_TRACK",
+  RENAME_TRACK = "RENAME_TRACK", // Added missing action type
   
   // Block/clip actions
   ADD_BLOCK = "ADD_BLOCK",
@@ -50,7 +51,10 @@ export enum ActionType {
   // Collaboration
   USER_JOINED = "USER_JOINED",
   USER_LEFT = "USER_LEFT",
-  CURSOR_MOVE = "CURSOR_MOVE"
+  CURSOR_MOVE = "CURSOR_MOVE",
+  
+  // History
+  RESTORE_TO_TIMESTAMP = "RESTORE_TO_TIMESTAMP"
 }
 
 export enum DispatchProcessStatus {

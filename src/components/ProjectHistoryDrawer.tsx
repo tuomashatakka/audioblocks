@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { 
   Drawer,
@@ -46,6 +45,7 @@ const ActionIcons: Record<string, React.ReactNode> = {
   [ActionType.REMOVE_MARKER]: <Trash size={16} />,
   [ActionType.INITIATE_FILE_UPLOAD]: <Plus size={16} />,
   [ActionType.COMPLETE_FILE_UPLOAD]: <Music size={16} />,
+  [ActionType.RENAME_TRACK]: <Music size={16} />,
 };
 
 // Helper function to get a human-readable action description
@@ -186,7 +186,7 @@ const ProjectHistoryDrawer: React.FC<ProjectHistoryDrawerProps> = ({ open, onOpe
   };
   
   const handleRestore = () => {
-    if (selectedHistoryIndex !== null) {
+    if (selectedHistoryIndex !== null && state.history && state.history.length > 0) {
       const entry = state.history[selectedHistoryIndex];
       restoreToTimestamp(entry.timestamp);
     }
@@ -200,7 +200,7 @@ const ProjectHistoryDrawer: React.FC<ProjectHistoryDrawerProps> = ({ open, onOpe
         </DrawerHeader>
         
         <div className="h-[60vh] overflow-y-auto">
-          {state.history.length === 0 ? (
+          {!state.history || state.history.length === 0 ? (
             <div className="p-4 text-center text-muted-foreground">
               No history entries yet. Actions will appear here as you work.
             </div>

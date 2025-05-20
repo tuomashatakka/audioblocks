@@ -23,11 +23,11 @@ const UserSettingsDialog: React.FC<UserSettingsDialogProps> = ({
   onOpenChange
 }) => {
   const { state, updateUserName } = useProject();
-  const [userName, setUserName] = useState(state.settings.userName || '');
+  const [userName, setUserName] = useState(state.settings?.userName || '');
 
   useEffect(() => {
-    setUserName(state.settings.userName || '');
-  }, [state.settings.userName, open]);
+    setUserName(state.settings?.userName || '');
+  }, [state.settings?.userName, open]);
 
   const handleSave = () => {
     if (userName.trim()) {

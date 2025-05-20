@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import WebSocketService from '@/utils/WebSocketService';
@@ -14,7 +15,7 @@ interface ProjectState {
     color: string;
     position: { x: number; y: number };
   }[];
-  settings?: {
+  settings: {
     theme: 'light' | 'dark';
     snapToGrid: boolean;
     gridSize: number;
@@ -276,20 +277,22 @@ const updateSettings = async (projectId: string, settings: ProjectSettings) => {
 };
 
 export const ProjectProvider = ({ children }: ProjectProviderProps) => {
+  const defaultSettings: ProjectSettings = {
+    theme: 'dark',
+    snapToGrid: true,
+    gridSize: 1,
+    autoSave: true,
+    showCollaborators: true,
+    userName: 'User'
+  };
+  
   const [state, setState] = useState<ProjectState>({
     localUserId: webSocketService.getLocalUserId(),
     localUserName: webSocketService.getLocalUserName(),
     projectId: null,
     isConnected: false,
     collaborators: [],
-    settings: {
-      theme: 'dark',
-      snapToGrid: true,
-      gridSize: 1,
-      autoSave: true,
-      showCollaborators: true,
-      userName: 'User'
-    },
+    settings: defaultSettings,
     history: []
   });
   
@@ -397,12 +400,15 @@ export const ProjectProvider = ({ children }: ProjectProviderProps) => {
       await updateSettings(state.projectId, settings as ProjectSettings);
       sendMessage(ActionType.UPDATE_SETTINGS, { settings });
       
+      // Create a properly typed complete settings object
+      const updatedSettings: ProjectSettings = {
+        ...state.settings,
+        ...settings
+      };
+      
       setState(prev => ({
         ...prev,
-        settings: {
-          ...prev.settings || {},
-          ...settings
-        }
+        settings: updatedSettings
       }));
     } catch (error) {
       console.error("Failed to update project settings:", error);
@@ -426,14 +432,17 @@ export const ProjectProvider = ({ children }: ProjectProviderProps) => {
   };
   
   const updateUserName = (userName: string) => {
+    // Ensure we maintain all required settings properties
+    const updatedSettings: ProjectSettings = {
+      ...state.settings,
+      userName
+    };
+    
     // Update user name in settings
     setState(prev => ({
       ...prev,
       localUserName: userName,
-      settings: {
-        ...prev.settings || {},
-        userName
-      }
+      settings: updatedSettings
     }));
     
     // Update the user name in the WebSocket service

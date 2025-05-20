@@ -48,7 +48,7 @@ type ProjectAction =
   | { type: 'UPDATE_SETTINGS'; payload: Partial<ProjectState['settings']> }
   | { type: 'ADD_HISTORY_ENTRY'; payload: ProjectHistoryEntry }
   | { type: 'RESTORE_FROM_HISTORY'; payload: number }
-  | { type: 'SET_LOCAL_USER_ID'; payload: string } // Add this action type
+  | { type: 'SET_LOCAL_USER_ID'; payload: string }
   | { type: 'CLEAR_HISTORY' };
 
 // Reducer function
@@ -288,10 +288,10 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
           volume: track.volume,
           muted: track.muted,
           solo: track.solo,
-          armed: track.armed,
-          locked: track.locked,
-          lockedByUser: track.locked_by_user_id,
-          lockedByUserName: track.locked_by_name
+          armed: track.armed ?? false,
+          locked: track.locked ?? false,
+          lockedByUser: track.locked_by_user_id ?? undefined,
+          lockedByUserName: track.locked_by_name ?? undefined
         };
       });
       
@@ -305,7 +305,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
           lengthBeats: block.length_beats,
           volume: block.volume,
           pitch: block.pitch,
-          fileId: block.file_id
+          fileId: block.file_id ?? null
         };
       });
       
@@ -313,9 +313,16 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
       const newProject: ProjectState = {
         id: projectData.id,
         name: projectData.name,
-        bpm: projectData.bpm,
-        masterVolume: projectData.master_volume,
-        settings: projectData.settings,
+        bpm: projectData.bpm ?? 120,
+        masterVolume: projectData.master_volume ?? 80,
+        settings: projectData.settings ?? {
+          snapToGrid: true,
+          gridSize: 1,
+          autoSave: true,
+          showCollaborators: true,
+          theme: 'dark',
+          userName: ''
+        },
         tracks,
         blocks,
         markers: {},
@@ -432,6 +439,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
         .insert({
           name,
           bpm,
+          master_volume: 80,
           settings: {
             snapToGrid: true,
             gridSize: 1,
@@ -450,9 +458,16 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
       const newProject: ProjectState = {
         id: projectData.id,
         name: projectData.name,
-        bpm: projectData.bpm,
+        bpm: projectData.bpm || 120,
         masterVolume: projectData.master_volume || 80,
-        settings: projectData.settings,
+        settings: projectData.settings || {
+          snapToGrid: true,
+          gridSize: 1,
+          autoSave: true,
+          showCollaborators: true,
+          theme: 'dark',
+          userName: ''
+        },
         tracks: {},
         blocks: {},
         markers: {},

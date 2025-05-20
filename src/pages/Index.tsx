@@ -475,9 +475,12 @@ const Index = () => {
           onMuteToggle={handleTrackMuteToggle}
           onSoloToggle={handleTrackSoloToggle}
           onArmToggle={handleTrackArmToggle}
-          onRename={() => {}}
+          onLockToggle={handleTrackLockToggle}
+          onRename={handleTrackRename}
           trackHeight={trackHeight}
           scrollTop={verticalScrollPosition}
+          onTrackListScroll={handleTrackListScroll}
+          localUserId={state.localUserId}
         />
         
         <div className="flex-grow overflow-hidden flex flex-col">

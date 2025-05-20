@@ -13,11 +13,12 @@ export type Database = {
         Row: {
           audio_url: string | null
           created_at: string
-          duration: number
+          file_id: string | null
           id: string
+          length_beats: number
           name: string
           pitch: number
-          start_time: number
+          start_beat: number
           track_id: string
           updated_at: string
           version: number
@@ -27,11 +28,12 @@ export type Database = {
         Insert: {
           audio_url?: string | null
           created_at?: string
-          duration: number
+          file_id?: string | null
           id?: string
+          length_beats: number
           name: string
           pitch?: number
-          start_time: number
+          start_beat: number
           track_id: string
           updated_at?: string
           version?: number
@@ -41,11 +43,12 @@ export type Database = {
         Update: {
           audio_url?: string | null
           created_at?: string
-          duration?: number
+          file_id?: string | null
           id?: string
+          length_beats?: number
           name?: string
           pitch?: number
-          start_time?: number
+          start_beat?: number
           track_id?: string
           updated_at?: string
           version?: number
@@ -243,25 +246,34 @@ export type Database = {
       }
       projects: {
         Row: {
+          bpm: number
           created_at: string
           id: string
+          master_volume: number
           name: string
+          settings: Json
           tracks: string[] | null
           updated_at: string
           user_id: string | null
         }
         Insert: {
+          bpm?: number
           created_at?: string
           id?: string
+          master_volume?: number
           name: string
+          settings?: Json
           tracks?: string[] | null
           updated_at?: string
           user_id?: string | null
         }
         Update: {
+          bpm?: number
           created_at?: string
           id?: string
+          master_volume?: number
           name?: string
+          settings?: Json
           tracks?: string[] | null
           updated_at?: string
           user_id?: string | null
@@ -353,9 +365,13 @@ export type Database = {
       }
       tracks: {
         Row: {
+          armed: boolean
           color: string
           created_at: string
           id: string
+          locked: boolean
+          locked_by_name: string | null
+          locked_by_user_id: string | null
           muted: boolean
           name: string
           project_id: string
@@ -364,9 +380,13 @@ export type Database = {
           volume: number
         }
         Insert: {
+          armed?: boolean
           color: string
           created_at?: string
           id?: string
+          locked?: boolean
+          locked_by_name?: string | null
+          locked_by_user_id?: string | null
           muted?: boolean
           name: string
           project_id: string
@@ -375,9 +395,13 @@ export type Database = {
           volume?: number
         }
         Update: {
+          armed?: boolean
           color?: string
           created_at?: string
           id?: string
+          locked?: boolean
+          locked_by_name?: string | null
+          locked_by_user_id?: string | null
           muted?: boolean
           name?: string
           project_id?: string

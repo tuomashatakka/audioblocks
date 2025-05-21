@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useRef } from 'react';
-import Toolbar from '@/components/Toolbar';
 import TrackList from '@/components/TrackList';
 import TrackBlock from '@/components/TrackBlock';
 import Timeline from '@/components/Timeline';
@@ -15,6 +14,7 @@ import { useProject } from '@/contexts/ProjectContext';
 import { TrackInfo } from '@/components/TrackList';
 import { ActionType } from '@/types/collaborative';
 import { ui } from '@/styles/ui-classes';
+import ToolbarWithStatus from '@/components/ToolbarWithStatus';
 
 interface Block {
   id: string;
@@ -50,7 +50,7 @@ const remoteUsers: RemoteUserInfo[] = [
 ];
 
 const Index = () => {
-  const { state, sendMessage, historyVisible, setHistoryVisible } = useProject();
+  const { state, sendMessage, historyVisible, setHistoryVisible, sendGeneralMessage } = useProject();
   
   const [isPlaying, setIsPlaying] = useState(false);
   const [bpm, setBpm] = useState(120);
@@ -149,6 +149,42 @@ const Index = () => {
     }
   };
 
+  // Connection/initialization effect
+  useEffect(() => {
+    // Mark the track area with the project-area class for cursor tracking
+    const trackArea = scrollContainerRef.current;
+    if (trackArea) {
+      trackArea.classList.add('project-area');
+    }
+    
+    // Send a general message to notify others that we've joined
+    sendGeneralMessage({
+      type: 'user_joined',
+      message: `${state.localUserName} joined the session`
+    });
+    
+    // Listen for general messages
+    const handleGeneralMessage = (message: any) => {
+      if (message.type === 'user_joined' && message.userId !== state.localUserId) {
+        toast({
+          title: "User Joined",
+          description: message.message,
+        });
+      }
+    };
+    
+    const webSocketService = window.getWebSocketService?.();
+    if (webSocketService) {
+      webSocketService.on('generalMessage', handleGeneralMessage);
+    }
+    
+    return () => {
+      if (webSocketService) {
+        webSocketService.off('generalMessage', handleGeneralMessage);
+      }
+    };
+  }, []);
+
   const handleBlockPositionChange = (id: string, newTrack: number, newStartBeat: number) => {
     if (isTrackLocked(newTrack)) {
       toast({
@@ -164,6 +200,14 @@ const Index = () => {
       adjustedStartBeat = Math.round(newStartBeat / settings.gridSize) * settings.gridSize;
     }
     
+    // Send message first to improve realtime feel
+    sendMessage(ActionType.MOVE_BLOCK, { 
+      blockId: id, 
+      trackId: newTrack,
+      startBeat: adjustedStartBeat 
+    });
+    
+    // Then update the local UI state
     setBlocks(prevBlocks => 
       prevBlocks.map(block => 
         block.id === id 
@@ -172,10 +216,13 @@ const Index = () => {
       )
     );
     
-    sendMessage(ActionType.MOVE_BLOCK, { 
-      blockId: id, 
+    // Notify other users about the block move
+    sendGeneralMessage({
+      type: 'block_moved',
+      blockId: id,
       trackId: newTrack,
-      startBeat: adjustedStartBeat 
+      startBeat: adjustedStartBeat,
+      message: `Block moved to track ${newTrack + 1}, beat ${adjustedStartBeat + 1}`
     });
   };
 
@@ -502,7 +549,7 @@ const Index = () => {
     <div className={ui.layout.fullScreen}>
       <div className={ui.overlay.gradient} />
       
-      <Toolbar 
+      <ToolbarWithStatus 
         isPlaying={isPlaying}
         bpm={bpm}
         volume={masterVolume}
@@ -557,7 +604,7 @@ const Index = () => {
           
           <div 
             ref={scrollContainerRef}
-            className={ui.layout.growContainer}
+            className={`${ui.layout.growContainer} project-area`}
             onClick={handleContainerClick}
             onDoubleClick={handleContainerDoubleClick}
             onScroll={handleScroll}
@@ -598,6 +645,7 @@ const Index = () => {
                 );
               })}
 
+              {/* Enhanced blocks with drag-and-drop */}
               {blocks.map(block => (
                 <TrackBlock 
                   key={block.id}
@@ -615,6 +663,16 @@ const Index = () => {
                   editingUserId={block.editingUserId}
                   isTrackLocked={isTrackLocked(block.track)}
                   activeTool={activeTool}
+                  localUserId={state.localUserId}
+                  currentBeat={currentBeat}
+                  onDeleteBlock={handleDeleteBlock}
+                  onDuplicateBlock={handleDuplicate}
+                  onBlockNameChange={handleBlockNameChange}
+                  onBlockLockToggle={handleToggleLock}
+                  onOpenBlockProperties={handleOpenProperties}
+                  snapToGridSize={settings.snapToGrid ? settings.gridSize : 0}
+                  gridSize={settings.gridSize}
+                  color={tracks[block.track]?.color}
                 />
               ))}
 

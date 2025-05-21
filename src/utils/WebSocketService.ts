@@ -13,7 +13,8 @@ class WebSocketService extends EventEmitter {
   private static instance: WebSocketService;
   private localUserId: string;
   private localUserName: string;
-  private connected: boolean = true;
+  private connected: boolean = false;
+  private connecting: boolean = false;
   private messageQueue: UserInteractionMessage[] = [];
   private localMessageQueue: UserInteractionMessage[] = [];
   private lastSyncTimestamp: number = Date.now();
@@ -23,7 +24,11 @@ class WebSocketService extends EventEmitter {
     data: ArrayBuffer[]
   }> = {};
   private channel: any; // RealtimeChannel type
+  private generalChannel: any; // Channel for general project messages
   private currentProjectId: string | null = null;
+  private connectionCheckInterval: number | null = null;
+  private reconnectTimeout: number | null = null;
+  private lastPingTime: number = Date.now();
 
   private constructor() {
     super();
@@ -37,6 +42,41 @@ class WebSocketService extends EventEmitter {
     if (!localStorage.getItem('userName')) {
       localStorage.setItem('userName', this.localUserName);
     }
+    
+    // Subscribe to the general channel on initialization
+    this.subscribeToGeneralChannel();
+    
+    // Setup connection checking
+    this.connectionCheckInterval = window.setInterval(() => this.checkConnection(), 30000);
+    
+    // Handle visibility change for reconnection
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') {
+        this.checkConnection();
+      }
+    });
+  }
+  
+  private checkConnection() {
+    const now = Date.now();
+    // If no ping in the last 2 minutes, try reconnecting
+    if (now - this.lastPingTime > 120000 && !this.connecting && !this.connected) {
+      this.reconnect();
+    }
+  }
+  
+  private reconnect() {
+    if (this.connecting) return;
+    
+    this.connecting = true;
+    this.emit('connectionStatusChanged', { status: 'connecting' });
+    
+    if (this.currentProjectId) {
+      this.connectToProject(this.currentProjectId);
+    }
+    
+    // Re-subscribe to general channel
+    this.subscribeToGeneralChannel();
   }
 
   public static getInstance(): WebSocketService {
@@ -78,12 +118,83 @@ class WebSocketService extends EventEmitter {
     return this.messageQueue;
   }
 
+  public isConnected(): boolean {
+    return this.connected;
+  }
+  
+  public subscribeToGeneralChannel() {
+    if (this.generalChannel) {
+      this.generalChannel.unsubscribe();
+    }
+    
+    this.connecting = true;
+    this.emit('connectionStatusChanged', { status: 'connecting' });
+    
+    // Subscribe to the general channel for all users
+    this.generalChannel = supabase
+      .channel('audioblocks-general')
+      .on('broadcast', { event: 'message' }, (payload) => {
+        // Handle general messages broadcasted to all users
+        this.emit('generalMessage', payload.payload);
+        this.lastPingTime = Date.now();
+      })
+      .on('presence', { event: 'sync' }, () => {
+        const state = this.generalChannel.presenceState();
+        this.emit('generalPresenceSync', state);
+        this.lastPingTime = Date.now();
+      })
+      .on('presence', { event: 'join' }, ({ key, newPresences }) => {
+        this.emit('generalPresenceJoin', { key, newPresences });
+        this.lastPingTime = Date.now();
+      })
+      .on('presence', { event: 'leave' }, ({ key, leftPresences }) => {
+        this.emit('generalPresenceLeave', { key, leftPresences });
+        this.lastPingTime = Date.now();
+      })
+      .subscribe((status: string) => {
+        if (status === 'SUBSCRIBED') {
+          // Track our presence in the general channel
+          this.generalChannel.track({
+            userId: this.localUserId,
+            userName: this.localUserName,
+            online_at: new Date().toISOString()
+          });
+          
+          this.connected = true;
+          this.connecting = false;
+          this.emit('connectionStatusChanged', { status: 'connected' });
+          
+          // Send a ping to initialize the general channel
+          this.sendGeneralMessage({
+            type: 'ping',
+            userId: this.localUserId,
+            userName: this.localUserName,
+            timestamp: Date.now()
+          });
+        } else if (status === 'CHANNEL_ERROR') {
+          this.connected = false;
+          this.connecting = false;
+          this.emit('connectionStatusChanged', { status: 'disconnected' });
+          
+          // Schedule reconnection attempt
+          if (!this.reconnectTimeout) {
+            this.reconnectTimeout = window.setTimeout(() => {
+              this.reconnectTimeout = null;
+              this.reconnect();
+            }, 5000);
+          }
+        }
+      });
+  }
+
   public connectToProject(projectId: string): void {
     if (this.channel) {
       this.channel.unsubscribe();
     }
     
     this.currentProjectId = projectId;
+    this.connecting = true;
+    this.emit('connectionStatusChanged', { status: 'connecting' });
     
     // Subscribe to the project channel
     this.channel = supabase
@@ -110,6 +221,8 @@ class WebSocketService extends EventEmitter {
         if (message.state === DispatchProcessStatus.FILE_AVAILABLE_TO_COLLABORATORS && message.filePayload) {
           this.emit('fileAvailable', message);
         }
+        
+        this.lastPingTime = Date.now();
       })
       // Listen to cursor movement updates
       .on('broadcast', { event: 'cursor_move' }, (payload) => {
@@ -119,19 +232,23 @@ class WebSocketService extends EventEmitter {
         }
         
         this.emit('cursorMove', payload.payload);
+        this.lastPingTime = Date.now();
       })
       // Listen to presence updates (who is online)
       .on('presence', { event: 'sync' }, () => {
         const state = this.channel.presenceState();
         this.emit('presenceSync', state);
+        this.lastPingTime = Date.now();
       })
       // Listen to users joining
       .on('presence', { event: 'join' }, ({ key, newPresences }) => {
         this.emit('presenceJoin', { key, newPresences });
+        this.lastPingTime = Date.now();
       })
       // Listen to users leaving
       .on('presence', { event: 'leave' }, ({ key, leftPresences }) => {
         this.emit('presenceLeave', { key, leftPresences });
+        this.lastPingTime = Date.now();
       })
       .subscribe((status) => {
         if (status === 'SUBSCRIBED') {
@@ -148,16 +265,28 @@ class WebSocketService extends EventEmitter {
           });
           
           this.connected = true;
+          this.connecting = false;
+          this.emit('connectionStatusChanged', { status: 'connected' });
           
           this.processLocalMessageQueue();
         } else if (status === 'CHANNEL_ERROR') {
           this.connected = false;
+          this.connecting = false;
+          this.emit('connectionStatusChanged', { status: 'disconnected' });
           
           toast({
             title: "Connection Lost",
             description: "Your changes will be synchronized when the connection is restored.",
             variant: "destructive",
           });
+          
+          // Schedule reconnection attempt
+          if (!this.reconnectTimeout) {
+            this.reconnectTimeout = window.setTimeout(() => {
+              this.reconnectTimeout = null;
+              this.reconnect();
+            }, 5000);
+          }
         }
       });
       
@@ -293,7 +422,36 @@ class WebSocketService extends EventEmitter {
       }, filePayload.size / 10000); // Simulate processing time based on file size
     }
     
+    this.lastPingTime = Date.now();
     return messageId;
+  }
+  
+  public sendGeneralMessage(message: any): void {
+    if (!this.connected || !this.generalChannel) {
+      toast({
+        title: "Connection Lost",
+        description: "Cannot send general message - connection lost.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    // Add user info to the message
+    const fullMessage = {
+      ...message,
+      userId: this.localUserId,
+      userName: this.localUserName,
+      timestamp: Date.now()
+    };
+    
+    // Broadcast to the general channel
+    this.generalChannel.broadcast({
+      type: 'broadcast',
+      event: 'message',
+      payload: fullMessage
+    });
+    
+    this.lastPingTime = Date.now();
   }
   
   public sendFileChunk(transferId: string, chunkIndex: number, totalChunks: number, data: ArrayBuffer): void {
@@ -472,6 +630,28 @@ class WebSocketService extends EventEmitter {
     }
     
     return result.buffer;
+  }
+  
+  public cleanup(): void {
+    // Cleanup any resources when the service is destroyed
+    if (this.connectionCheckInterval) {
+      window.clearInterval(this.connectionCheckInterval);
+    }
+    
+    if (this.reconnectTimeout) {
+      window.clearTimeout(this.reconnectTimeout);
+    }
+    
+    if (this.channel) {
+      this.channel.unsubscribe();
+    }
+    
+    if (this.generalChannel) {
+      this.generalChannel.unsubscribe();
+    }
+    
+    document.removeEventListener('mousemove', this.throttledCursorUpdate);
+    document.removeEventListener('visibilitychange', this.checkConnection);
   }
 }
 

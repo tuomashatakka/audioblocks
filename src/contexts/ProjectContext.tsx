@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import WebSocketService from '@/utils/WebSocketService';
@@ -50,6 +49,7 @@ interface ProjectContextType {
   setSelectedHistoryIndex: (index: number | null) => void;
   restoreToTimestamp: (timestamp: number) => void;
   updateUserName: (name: string) => void;
+  sendGeneralMessage: (message: any) => void;
 }
 
 const ProjectContext = createContext<ProjectContextType | undefined>(undefined);
@@ -346,14 +346,29 @@ export const ProjectProvider = ({ children }: ProjectProviderProps) => {
       });
     };
     
+    const handleConnectionStatusChanged = (data: { status: 'connecting' | 'connected' | 'disconnected' }) => {
+      setState(prev => ({
+        ...prev,
+        isConnected: data.status === 'connected'
+      }));
+    };
+    
     webSocketService.on('connected', handleConnected);
     webSocketService.on('presenceSync', handlePresenceSync);
     webSocketService.on('cursorMove', handleCursorMove);
+    webSocketService.on('connectionStatusChanged', handleConnectionStatusChanged);
+    
+    // Initialize connection status
+    setState(prev => ({
+      ...prev,
+      isConnected: webSocketService.isConnected()
+    }));
     
     return () => {
       webSocketService.off('connected', handleConnected);
       webSocketService.off('presenceSync', handlePresenceSync);
       webSocketService.off('cursorMove', handleCursorMove);
+      webSocketService.off('connectionStatusChanged', handleConnectionStatusChanged);
     };
   }, [state.localUserId]);
   
@@ -454,6 +469,10 @@ export const ProjectProvider = ({ children }: ProjectProviderProps) => {
     }
   };
   
+  const sendGeneralMessage = (message: any) => {
+    webSocketService.sendGeneralMessage(message);
+  };
+  
   return (
     <ProjectContext.Provider 
       value={{
@@ -468,7 +487,8 @@ export const ProjectProvider = ({ children }: ProjectProviderProps) => {
         selectedHistoryIndex,
         setSelectedHistoryIndex,
         restoreToTimestamp,
-        updateUserName
+        updateUserName,
+        sendGeneralMessage
       }}
     >
       {children}

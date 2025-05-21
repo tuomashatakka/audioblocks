@@ -54,7 +54,14 @@ export enum ActionType {
   CURSOR_MOVE = "CURSOR_MOVE",
   
   // History
-  RESTORE_TO_TIMESTAMP = "RESTORE_TO_TIMESTAMP"
+  RESTORE_TO_TIMESTAMP = "RESTORE_TO_TIMESTAMP",
+  
+  // New action types
+  RENAME_TRACK = 'RENAME_TRACK',
+  DUPLICATE_BLOCK = 'DUPLICATE_BLOCK',
+  SPLIT_BLOCK = 'SPLIT_BLOCK',
+  GENERAL_MESSAGE = 'GENERAL_MESSAGE',
+  CONNECTION_STATUS = 'CONNECTION_STATUS'
 }
 
 export enum DispatchProcessStatus {
@@ -214,4 +221,23 @@ export interface ProjectSettings {
   showCollaborators: boolean;
   theme: 'dark' | 'light';
   userName?: string;
+}
+
+// New types for connection status
+export type ConnectionStatus = 'connecting' | 'connected' | 'disconnected';
+
+export interface ConnectionStatusMessage {
+  status: ConnectionStatus;
+  timestamp: number;
+  userId: string;
+  userName: string;
+}
+
+export interface GeneralMessage {
+  type: string;
+  message: string;
+  userId: string;
+  userName: string;
+  timestamp: number;
+  [key: string]: any; // Allow additional properties
 }

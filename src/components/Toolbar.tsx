@@ -62,10 +62,10 @@ const Toolbar: React.FC<ToolbarProps> = ({
       </div>
 
       <div className={ui.toolbarSection}>
-        <Button variant="outline" className={ui.button.transport} onClick={onRestart}>
+        <Button variant="outline" className={ui.button.secondary} onClick={onRestart}>
           <Redo className="h-5 w-5" />
         </Button>
-        <Button variant="outline" className={ui.button.transport} onClick={isPlaying ? onPause : onPlay}>
+        <Button variant="outline" className={ui.button.secondary} onClick={isPlaying ? onPause : onPlay}>
           {isPlaying ? <Pause className="h-6 w-6" /> : <Play className="h-6 w-6" />}
         </Button>
       </div>
@@ -97,10 +97,10 @@ const Toolbar: React.FC<ToolbarProps> = ({
           onZoomIn={onZoomIn} 
           onZoomOut={onZoomOut}
         />
-        <Button variant="ghost" className={ui.button.icon} onClick={onZoomIn}>
+        <Button variant="ghost" size="icon" onClick={onZoomIn}>
           <ZoomIn className="h-5 w-5" />
         </Button>
-        <Button variant="ghost" className={ui.button.icon} onClick={onZoomOut}>
+        <Button variant="ghost" size="icon" onClick={onZoomOut}>
           <ZoomOut className="h-5 w-5" />
         </Button>
       </div>

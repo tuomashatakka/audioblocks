@@ -10,8 +10,8 @@ export type ToolType = "select" | "pan" | "boxSelect";
 interface ToolsMenuProps {
   activeTool: ToolType;
   onChangeTool: (tool: ToolType) => void;
-  onZoomIn: () => void;
-  onZoomOut: () => void;
+  onZoomIn?: () => void;
+  onZoomOut?: () => void;
 }
 
 const ToolsMenu: React.FC<ToolsMenuProps> = ({
@@ -56,10 +56,10 @@ const ToolsMenu: React.FC<ToolsMenuProps> = ({
         onChangeTool("boxSelect");
         break;
       case "+":
-        onZoomIn();
+        if (onZoomIn) onZoomIn();
         break;
       case "-":
-        onZoomOut();
+        if (onZoomOut) onZoomOut();
         break;
     }
   };
@@ -101,27 +101,31 @@ const ToolsMenu: React.FC<ToolsMenuProps> = ({
         </Tooltip>
       ))}
 
-      <div className="w-px h-6 bg-border mx-1" />
+      {(onZoomIn || onZoomOut) && <div className="w-px h-6 bg-border mx-1" />}
 
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={onZoomIn}>
-            <ZoomIn size={16} />
-            <span className="sr-only">Zoom In</span>
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent side="bottom">Zoom In (+)</TooltipContent>
-      </Tooltip>
+      {onZoomIn && (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={onZoomIn}>
+              <ZoomIn size={16} />
+              <span className="sr-only">Zoom In</span>
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="bottom">Zoom In (+)</TooltipContent>
+        </Tooltip>
+      )}
 
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={onZoomOut}>
-            <ZoomOut size={16} />
-            <span className="sr-only">Zoom Out</span>
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent side="bottom">Zoom Out (-)</TooltipContent>
-      </Tooltip>
+      {onZoomOut && (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={onZoomOut}>
+              <ZoomOut size={16} />
+              <span className="sr-only">Zoom Out</span>
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="bottom">Zoom Out (-)</TooltipContent>
+        </Tooltip>
+      )}
     </div>
   );
 };

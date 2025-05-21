@@ -1,3 +1,4 @@
+
 import type { MarkerIcon } from "@/components/TimelineMarker";
 
 export enum ActionType {
@@ -16,7 +17,7 @@ export enum ActionType {
   SET_TRACK_VOLUME = "SET_TRACK_VOLUME",
   LOCK_TRACK = "LOCK_TRACK",
   UNLOCK_TRACK = "UNLOCK_TRACK",
-  RENAME_TRACK = "RENAME_TRACK", // Added missing action type
+  RENAME_TRACK = "RENAME_TRACK", 
   
   // Block/clip actions
   ADD_BLOCK = "ADD_BLOCK",
@@ -57,7 +58,6 @@ export enum ActionType {
   RESTORE_TO_TIMESTAMP = "RESTORE_TO_TIMESTAMP",
   
   // New action types
-  RENAME_TRACK = 'RENAME_TRACK',
   DUPLICATE_BLOCK = 'DUPLICATE_BLOCK',
   SPLIT_BLOCK = 'SPLIT_BLOCK',
   GENERAL_MESSAGE = 'GENERAL_MESSAGE',

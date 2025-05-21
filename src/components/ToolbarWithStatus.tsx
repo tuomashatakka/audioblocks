@@ -2,6 +2,7 @@
 import React from 'react';
 import Toolbar from './Toolbar';
 import ConnectionStatus from './ConnectionStatus';
+import { ToolType } from './ToolsMenu';
 
 interface ToolbarWithStatusProps {
   isPlaying: boolean;
@@ -14,8 +15,8 @@ interface ToolbarWithStatusProps {
   onVolumeChange: (volume: number) => void;
   onAddTrack: () => void;
   usersCount: number;
-  activeTool: string;
-  onChangeTool: (tool: any) => void;
+  activeTool: ToolType;
+  onChangeTool: (tool: ToolType) => void;
   onZoomIn: () => void;
   onZoomOut: () => void;
   onOpenSettings: () => void;

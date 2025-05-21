@@ -97,6 +97,70 @@ const Index = () => {
     { id: 'block5', name: 'Vocal Chop', track: 3, startBeat: 16, lengthBeats: 8, volume: 85, pitch: 2 },
   ]);
 
+  const handleDuplicate = (blockId: string) => {
+    const blockToDuplicate = blocks.find(block => block.id === blockId);
+    if (!blockToDuplicate) return;
+    
+    const newBlockId = `block${blocks.length + 1}`;
+    const newBlock = {
+      ...blockToDuplicate,
+      id: newBlockId,
+      startBeat: blockToDuplicate.startBeat + blockToDuplicate.lengthBeats,
+      name: `${blockToDuplicate.name} (copy)`
+    };
+    
+    setBlocks([...blocks, newBlock]);
+    sendMessage(ActionType.DUPLICATE_BLOCK, { 
+      originalBlockId: blockId,
+      newBlockId: newBlockId,
+      newStartBeat: newBlock.startBeat
+    });
+    
+    toast({
+      title: "Block Duplicated",
+      description: `Created a copy of "${blockToDuplicate.name}".`,
+    });
+  };
+
+  const handleToggleLock = (blockId: string) => {
+    setBlocks(prevBlocks => prevBlocks.map(block => {
+      if (block.id === blockId) {
+        const newEditingState = block.editingUserId ? null : state.localUserId;
+        return {
+          ...block,
+          editingUserId: newEditingState
+        };
+      }
+      return block;
+    }));
+    
+    const block = blocks.find(b => b.id === blockId);
+    const action = block?.editingUserId ? ActionType.END_EDITING_BLOCK : ActionType.START_EDITING_BLOCK;
+    
+    sendMessage(action, { blockId });
+    
+    toast({
+      title: "Block Lock Changed",
+      description: "Block editing status has been updated.",
+    });
+  };
+
+  const handleOpenProperties = (blockId: string) => {
+    const block = blocks.find(block => block.id === blockId);
+    if (!block) return;
+    
+    if (block.editingUserId && block.editingUserId !== state.localUserId) {
+      toast({
+        title: "Block is being edited",
+        description: `This clip is currently being edited by another user.`,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    handleSelectBlock(blockId);
+  };
+
   const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
     const { scrollLeft, scrollTop } = e.currentTarget;
     setHorizontalScrollPosition(scrollLeft);

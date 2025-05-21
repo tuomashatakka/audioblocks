@@ -1,9 +1,8 @@
-
 // A class to handle audio loading, playback and analysis
 export class AudioEngine {
   private audioContext: AudioContext | null = null;
   private audioBuffers: Map<string, AudioBuffer> = new Map();
-  private audioSources: AudioBufferSourceNode[] = new Map();
+  private audioSources: AudioBufferSourceNode[] = [];
   private gainNode: GainNode | null = null;
   private analyser: AnalyserNode | null = null;
   private startTime: number = 0;

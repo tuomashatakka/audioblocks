@@ -1,8 +1,8 @@
 
 import React, { useState, useEffect } from 'react';
-import { Drawer, DrawerContent, DrawerTrigger } from "@/components/ui/drawer";
+import { Drawer, DrawerContent } from "@/components/ui/drawer";
 import { Button } from "@/components/ui/button";
-import { WaveformIcon, XIcon } from 'lucide-react';
+import { Waveform, X } from 'lucide-react';
 import FrequencyGraph from './FrequencyGraph';
 import { getAudioEngine } from '@/utils/AudioEngine';
 
@@ -34,7 +34,7 @@ const FrequencyDrawer: React.FC<FrequencyDrawerProps> = ({ isPlaying }) => {
             className="flex items-center gap-2"
             onClick={() => setIsOpen(!isOpen)}
           >
-            {isOpen ? <XIcon size={18} /> : <WaveformIcon size={18} />}
+            {isOpen ? <X size={18} /> : <Waveform size={18} />}
             {isOpen ? "Hide Frequency Graph" : "Show Frequency Graph"}
           </Button>
         </div>

@@ -3,8 +3,8 @@ import { EventEmitter } from '@/utils/eventEmitter'
 import { UserInteractionMessage, ActionType, DispatchProcessStatus } from '@/types/collaborative'
 
 
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL as string
-const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY as string
+const SUPABASE_URL = typeof process === 'undefined' ? import.meta.env.VITE_SUPABASE_URL : process.env.NEXT_PUBLIC_SUPABASE_URL as string
+const SUPABASE_ANON_KEY = typeof process === 'undefined' ? import.meta.env.VITE_SUPABASE_ANON_KEY : process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY as string
 
 class SupabaseRealtimeService extends EventEmitter {
   private static instance: SupabaseRealtimeService

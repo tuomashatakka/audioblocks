@@ -1,156 +1,181 @@
-import React from 'react'
+
+import React from 'react';
 import {
   ContextMenu,
   ContextMenuContent,
   ContextMenuItem,
   ContextMenuSeparator,
-  ContextMenuTrigger,
-  ContextMenuGroup,
   ContextMenuSub,
-  ContextMenuSubTrigger,
   ContextMenuSubContent,
-} from '@/components/ui/context-menu'
-import { toast } from '@/hooks/use-toast'
-import { Copy, Edit, Move, Settings, Trash2, Scissors, Volume2, Lock, Unlock, ArrowLeft, ArrowRight } from 'lucide-react'
-import { ui } from '@/styles/ui-classes'
+  ContextMenuSubTrigger,
+  ContextMenuTrigger
+} from '@/components/ui/context-menu';
+import { 
+  ArrowLeft, 
+  ArrowRight,
+  Lock,
+  Scissors,
+  Copy,
+  Trash2,
+  SplitSquareVertical,
+  Maximize2,
+  Minimize2
+} from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { ui } from '@/styles/ui-classes';
 
+export type BlockContextMenuProps = {
+  children: React.ReactNode;
+  onNudgeLeft: () => void;
+  onNudgeRight: () => void;
+  onSplit: () => void;
+  onDelete: () => void;
+  onDuplicate: () => void;
+  onToggleLock: () => void;
+  isLocked: boolean;
+  canSplit: boolean;
+  position?: { x: number; y: number };
+  onTimeStretchOpen?: () => void;
+  onGainChange?: () => void;
+  onPitchChange?: () => void;
+  onRename?: () => void;
+  onEdit?: () => void;
+  currentPlayheadPosition?: number;
+};
 
-interface BlockContextMenuProps {
-  children:       React.ReactNode;
-  onEdit:         () => void;
-  onDelete:       () => void;
-  onDuplicate:    () => void;
-  onShowSettings: () => void;
-  disabled?:      boolean;
-  isLocked?:      boolean;
-  onToggleLock?:  () => void;
-  onSplit?:       () => void;
-  onNudgeLeft?:   () => void;
-  onNudgeRight?:  () => void;
-}
-
-const BlockContextMenu: React.FC<BlockContextMenuProps> = ({
+export const BlockContextMenu: React.FC<BlockContextMenuProps> = ({
   children,
-  onEdit,
-  onDelete,
-  onDuplicate,
-  onShowSettings,
-  disabled = false,
-  isLocked = false,
-  onToggleLock,
-  onSplit,
   onNudgeLeft,
   onNudgeRight,
+  onSplit,
+  onDelete,
+  onDuplicate,
+  onToggleLock,
+  isLocked,
+  canSplit,
+  position,
+  onTimeStretchOpen,
+  onGainChange,
+  onPitchChange,
+  onRename,
+  onEdit,
+  currentPlayheadPosition
 }) => {
-  if (disabled)
-    return <>{children}</>
+  return (
+    <ContextMenu>
+      <ContextMenuTrigger asChild>
+        {children}
+      </ContextMenuTrigger>
+      <ContextMenuContent 
+        className={cn(
+          ui.contextMenu.container,
+          "w-64"
+        )}
+      >
+        <div className="p-2 text-xs font-medium text-muted-foreground border-b border-border mb-1">
+          Clip Operations
+        </div>
 
-  const handleContextAction = (action: () => void, actionName: string) => {
-    if (isLocked && actionName !== 'unlock') {
-      toast({
-        title:       'Action not allowed',
-        description: 'This block is currently being edited by another user.',
-        variant:     'destructive',
-      })
-      return
-    }
-    action()
-  }
+        <ContextMenuItem 
+          onClick={onRename}
+          className={cn(ui.contextMenu.item)}
+          disabled={isLocked}
+        >
+          <span className="mr-2">🏷️</span> Rename
+        </ContextMenuItem>
 
-  return <ContextMenu>
-    <ContextMenuTrigger asChild>{children}</ContextMenuTrigger>
-
-    <ContextMenuContent className='w-64 bg-background/95 backdrop-blur-sm border border-border shadow-lg'>
-      <ContextMenuItem
-        className='flex items-center'
-        onClick={ () => handleContextAction(onEdit, 'edit') }
-        disabled={ isLocked }>
-        <Edit className='mr-2 h-4 w-4' />
-        <span>Edit Block</span>
-      </ContextMenuItem>
-
-      <ContextMenuItem
-        className='flex items-center'
-        onClick={ () => handleContextAction(onDuplicate, 'duplicate') }
-        disabled={ isLocked }>
-        <Copy className='mr-2 h-4 w-4' />
-        <span>Duplicate</span>
-      </ContextMenuItem>
-
-      {onSplit &&
-          <ContextMenuItem
-            className='flex items-center'
-            onClick={ () => handleContextAction(onSplit, 'split') }
-            disabled={ isLocked }>
-            <Scissors className='mr-2 h-4 w-4' />
-            <span>Split at Playhead</span>
-          </ContextMenuItem>
-      }
-
-      <ContextMenuSeparator />
-
-      <ContextMenuGroup>
-        {onNudgeLeft &&
-            <ContextMenuItem
-              className='flex items-center'
-              onClick={ () => handleContextAction(onNudgeLeft, 'nudgeLeft') }
-              disabled={ isLocked }>
-              <ArrowLeft className='mr-2 h-4 w-4' />
-              <span>Nudge Left</span>
+        <ContextMenuItem 
+          onClick={onEdit}
+          className={cn(ui.contextMenu.item)}
+          disabled={isLocked}
+        >
+          <span className="mr-2">✏️</span> Edit Properties
+        </ContextMenuItem>
+        
+        <ContextMenuSeparator />
+        
+        <ContextMenuItem 
+          onClick={onNudgeLeft}
+          className={cn(ui.contextMenu.item)}
+          disabled={isLocked}
+        >
+          <ArrowLeft className="mr-2 h-4 w-4" /> Nudge Left
+        </ContextMenuItem>
+        
+        <ContextMenuItem 
+          onClick={onNudgeRight}
+          className={cn(ui.contextMenu.item)}
+          disabled={isLocked}
+        >
+          <ArrowRight className="mr-2 h-4 w-4" /> Nudge Right
+        </ContextMenuItem>
+        
+        <ContextMenuSeparator />
+        
+        <ContextMenuItem 
+          onClick={onSplit}
+          className={cn(ui.contextMenu.item)}
+          disabled={isLocked || !canSplit}
+        >
+          <Scissors className="mr-2 h-4 w-4" /> Split at Playhead
+        </ContextMenuItem>
+        
+        <ContextMenuItem 
+          onClick={onDuplicate}
+          className={cn(ui.contextMenu.item)}
+          disabled={isLocked}
+        >
+          <Copy className="mr-2 h-4 w-4" /> Duplicate
+        </ContextMenuItem>
+        
+        <ContextMenuSeparator />
+        
+        <ContextMenuSub>
+          <ContextMenuSubTrigger className={cn(ui.contextMenu.subTrigger)} disabled={isLocked}>
+            <SplitSquareVertical className="mr-2 h-4 w-4" /> 
+            Advanced
+          </ContextMenuSubTrigger>
+          <ContextMenuSubContent className={cn(ui.contextMenu.subContent)}>
+            <ContextMenuItem 
+              onClick={onTimeStretchOpen}
+              className={cn(ui.contextMenu.item)}
+            >
+              <Maximize2 className="mr-2 h-4 w-4" /> Time Stretch
             </ContextMenuItem>
-        }
-
-        {onNudgeRight &&
-            <ContextMenuItem
-              className='flex items-center'
-              onClick={ () => handleContextAction(onNudgeRight, 'nudgeRight') }
-              disabled={ isLocked }>
-              <ArrowRight className='mr-2 h-4 w-4' />
-              <span>Nudge Right</span>
+            <ContextMenuItem 
+              onClick={onGainChange}
+              className={cn(ui.contextMenu.item)}
+            >
+              Volume Adjustment
             </ContextMenuItem>
-        }
-      </ContextMenuGroup>
-
-      {onToggleLock &&
-          <>
-            <ContextMenuSeparator />
-
-            <ContextMenuItem
-              className='flex items-center'
-              onClick={ () => handleContextAction(onToggleLock, isLocked ? 'unlock' : 'lock') }>
-              {isLocked
-                ? <>
-                  <Unlock className='mr-2 h-4 w-4' />
-                  <span>Unlock</span>
-                </>
-                : <>
-                  <Lock className='mr-2 h-4 w-4' />
-                  <span>Lock</span>
-                </>
-              }
+            <ContextMenuItem 
+              onClick={onPitchChange}
+              className={cn(ui.contextMenu.item)}
+            >
+              <Minimize2 className="mr-2 h-4 w-4" /> Pitch Shift
             </ContextMenuItem>
-          </>
-      }
+          </ContextMenuSubContent>
+        </ContextMenuSub>
+        
+        <ContextMenuSeparator />
+        
+        <ContextMenuItem 
+          onClick={onToggleLock}
+          className={cn(ui.contextMenu.item, isLocked ? "text-green-500" : "")}
+        >
+          <Lock className="mr-2 h-4 w-4" /> {isLocked ? "Unlock" : "Lock"}
+        </ContextMenuItem>
+        
+        <ContextMenuItem 
+          onClick={onDelete}
+          className={cn(ui.contextMenu.item, "text-destructive")}
+          disabled={isLocked}
+        >
+          <Trash2 className="mr-2 h-4 w-4" /> Delete
+        </ContextMenuItem>
+      </ContextMenuContent>
+    </ContextMenu>
+  );
+};
 
-      <ContextMenuItem
-        className='flex items-center'
-        onClick={ () => handleContextAction(onShowSettings, 'settings') }
-        disabled={ isLocked }>
-        <Settings className='mr-2 h-4 w-4' />
-        <span>Settings</span>
-      </ContextMenuItem>
-
-      <ContextMenuSeparator />
-
-      <ContextMenuItem
-        className='flex items-center text-destructive focus:text-destructive'
-        onClick={ () => handleContextAction(onDelete, 'delete') }
-        disabled={ isLocked }>
-        <Trash2 className='mr-2 h-4 w-4' />
-        <span>Delete</span>
-      </ContextMenuItem>
-    </ContextMenuContent>
-  </ContextMenu>
-}
-
-export default BlockContextMenu
+export default BlockContextMenu;

@@ -1,447 +1,518 @@
-'use client'
+import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { supabase } from '@/integrations/supabase/client';
+import WebSocketService from '@/utils/WebSocketService';
+import { ActionType, UserInteractionMessage, ProjectHistoryEntry } from '@/types/collaborative';
 
-import React, { createContext, useContext, useReducer, useEffect, useState, useCallback, useMemo } from 'react'
-import SupabaseRealtimeService from '@/integrations/supabase/realtimeService'
-import {
-  ActionType,
-  ProjectState,
-  UserInteractionMessage,
-  TrackInfo,
-  BlockInfo,
-  MarkerInfo,
-  ProjectHistoryEntry,
-  FilePayload
-} from '@/types/collaborative'
-import { toast } from '@/hooks/use-toast'
-
-// Initial state
-const initialProjectState: ProjectState = {
-  id:           '',
-  name:         'Untitled Project',
-  bpm:          120,
-  tracks:       {},
-  blocks:       {},
-  markers:      {},
-  masterVolume: 80,
-  settings:     {
-    snapToGrid:        true,
-    gridSize:          1,
-    autoSave:          true,
-    showCollaborators: true,
-    theme:             'dark'
-  },
-  assets:      {},
-  users:       {},
-  history:     [],
-  localUserId: '' // Initialize with empty string
+interface ProjectState {
+  localUserId: string;
+  localUserName: string;
+  projectId: string | null;
+  isConnected: boolean;
+  collaborators: {
+    id: string;
+    name: string;
+    color: string;
+    position: { x: number; y: number };
+  }[];
+  settings: {
+    theme: 'light' | 'dark';
+    snapToGrid: boolean;
+    gridSize: number;
+    autoSave: boolean;
+    showCollaborators: boolean;
+    userName?: string;
+    [key: string]: string | number | boolean | undefined;
+  };
+  history: ProjectHistoryEntry[];
 }
 
-// Action types for the reducer
-type ProjectAction =
-  | { type: 'SET_PROJECT'; payload: ProjectState }
-  | { type: 'UPDATE_TRACKS'; payload: Record<string, TrackInfo> }
-  | { type: 'UPDATE_BLOCKS'; payload: Record<string, BlockInfo> }
-  | { type: 'UPDATE_MARKERS'; payload: Record<string, MarkerInfo> }
-  | { type: 'SET_BPM'; payload: number }
-  | { type: 'SET_MASTER_VOLUME'; payload: number }
-  | { type: 'UPDATE_SETTINGS'; payload: Partial<ProjectState['settings']> }
-  | { type: 'ADD_HISTORY_ENTRY'; payload: ProjectHistoryEntry }
-  | { type: 'RESTORE_FROM_HISTORY'; payload: number }
-  | { type: 'SET_LOCAL_USER_ID'; payload: string } // Add this action type
-  | { type: 'CLEAR_HISTORY' }
-
-// Reducer function
-const projectReducer = (state: ProjectState, action: ProjectAction): ProjectState => {
-  switch (action.type) {
-    case 'SET_PROJECT':
-      return action.payload
-    case 'UPDATE_TRACKS':
-      return {
-        ...state,
-        tracks: {
-          ...state.tracks,
-          ...action.payload
-        }
-      }
-    case 'UPDATE_BLOCKS':
-      return {
-        ...state,
-        blocks: {
-          ...state.blocks,
-          ...action.payload
-        }
-      }
-    case 'UPDATE_MARKERS':
-      return {
-        ...state,
-        markers: {
-          ...state.markers,
-          ...action.payload
-        }
-      }
-    case 'SET_BPM':
-      return {
-        ...state,
-        bpm: action.payload
-      }
-    case 'SET_MASTER_VOLUME':
-      return {
-        ...state,
-        masterVolume: action.payload
-      }
-    case 'UPDATE_SETTINGS':
-      return {
-        ...state,
-        settings: {
-          ...state.settings,
-          ...action.payload
-        }
-      }
-    case 'ADD_HISTORY_ENTRY':
-      return {
-        ...state,
-        history: [ ...state.history, action.payload ]
-      }
-    case 'RESTORE_FROM_HISTORY':
-    // Here we would actually restore the state from history
-    // This is simplified - a real implementation would reconstruct state
-    // by replaying messages up to the timestamp
-      return {
-        ...state
-      }
-    case 'SET_LOCAL_USER_ID':
-      return {
-        ...state,
-        localUserId: action.payload
-      }
-    case 'CLEAR_HISTORY':
-      return {
-        ...state,
-        history: []
-      }
-    default:
-      return state
-  }
+interface ProjectSettings {
+  theme: 'light' | 'dark';
+  snapToGrid: boolean;
+  gridSize: number;
+  autoSave: boolean;
+  showCollaborators: boolean;
+  userName?: string;
+  [key: string]: string | number | boolean | undefined; // Index signature to allow additional properties
 }
 
-// Context interface
 interface ProjectContextType {
-  state:                   ProjectState;
-  dispatch:                React.Dispatch<ProjectAction>;
-  sendMessage:             (action: ActionType, params: any, filePayload?: FilePayload) => Promise<void>;
-  uploadFile:              (file: File, onProgress?: (progress: number) => void) => Promise<string>;
-  historyVisible:          boolean;
-  setHistoryVisible:       (visible: boolean) => void;
-  restoreToTimestamp:      (timestamp: number) => void;
-  selectedHistoryIndex:    number | null;
+  state: ProjectState;
+  sendMessage: (action: ActionType, params: any) => string;
+  connectToProject: (projectId: string) => Promise<void>;
+  disconnectFromProject: () => void;
+  messageHistory: UserInteractionMessage[];
+  historyVisible: boolean;
+  setHistoryVisible: (visible: boolean) => void;
+  updateProjectSettings: (settings: Partial<ProjectSettings>) => Promise<void>;
+  selectedHistoryIndex: number | null;
   setSelectedHistoryIndex: (index: number | null) => void;
+  restoreToTimestamp: (timestamp: number) => void;
+  updateUserName: (name: string) => void;
+  sendGeneralMessage: (message: any) => void;
 }
 
-// Create context
-// eslint-disable-next-line react/display-name
-const ProjectContext = createContext<ProjectContextType | undefined>(undefined)
+const ProjectContext = createContext<ProjectContextType | undefined>(undefined);
 
-// Provider component
-export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [ state, dispatch ] = useReducer(projectReducer, initialProjectState)
-  const supabaseRealtimeService = useMemo(() => SupabaseRealtimeService.getInstance(), [])
-  const [ historyVisible, setHistoryVisible ] = useState(false)
-  const [ selectedHistoryIndex, setSelectedHistoryIndex ] = useState<number | null>(null)
+const webSocketService = WebSocketService.getInstance();
 
-  // Initialize project from localStorage or create new one
-  useEffect(() => {
-    const savedProject = localStorage.getItem('currentProject')
-    if (savedProject)
+interface ProjectProviderProps {
+  children: ReactNode;
+}
+
+const fetchProjectData = async (projectId: string) => {
+  try {
+    // Fetch project details
+    const { data: projectData, error: projectError } = await supabase
+      .from('projects')
+      .select('*')
+      .eq('id', projectId)
+      .single();
+      
+    if (projectError) throw projectError;
+    
+    // Parse settings JSON from the database
+    let projectSettings: ProjectSettings = {
+      theme: 'dark',
+      snapToGrid: true,
+      gridSize: 1,
+      autoSave: true,
+      showCollaborators: true
+    };
+    
+    if (projectData.settings) {
       try {
-        const parsedProject = JSON.parse(savedProject)
-        dispatch({ type: 'SET_PROJECT', payload: parsedProject })
+        // If settings is a string, parse it, otherwise use as is
+        const parsedSettings = typeof projectData.settings === 'string' 
+          ? JSON.parse(projectData.settings) 
+          : projectData.settings;
+          
+        projectSettings = {
+          ...projectSettings, // Keep defaults
+          ...parsedSettings   // Override with stored settings
+        };
+      } catch (e) {
+        console.error("Failed to parse project settings:", e);
       }
-      catch (error) {
-        console.error('Failed to load project from localStorage', error)
-      } else {
-      // Create a new project
-      const newProject: ProjectState = {
-        ...initialProjectState,
-        id: `project-${Date.now()}`
-      }
-      dispatch({ type: 'SET_PROJECT', payload: newProject })
     }
+    
+    // Fetch tracks
+    const { data: tracksData, error: tracksError } = await supabase
+      .from('tracks')
+      .select('*')
+      .eq('project_id', projectId);
+      
+    if (tracksError) throw tracksError;
+    
+    // Fetch audio blocks
+    const { data: blocksData, error: blocksError } = await supabase
+      .from('audio_blocks')
+      .select('*')
+      .in('track_id', tracksData.map(track => track.id));
+      
+    if (blocksError) throw blocksError;
+    
+    // Transform the data to match the application structure
+    const formattedTracks = tracksData.map(track => ({
+      id: track.id,
+      name: track.name,
+      color: track.color,
+      volume: track.volume,
+      muted: track.muted,
+      solo: track.solo,
+      armed: track.armed ?? false,
+      locked: track.locked ?? false,
+      lockedByUser: track.locked_by_user_id || null,
+      lockedByUserName: track.locked_by_name || null
+    }));
+    
+    const formattedBlocks = blocksData.map(block => ({
+      id: block.id,
+      track: formattedTracks.findIndex(track => track.id === block.track_id),
+      startBeat: block.start_beat,
+      lengthBeats: block.length_beats,
+      name: block.name,
+      volume: block.volume,
+      pitch: block.pitch,
+      fileId: block.file_id
+    }));
+    
+    return {
+      project: {
+        id: projectData.id,
+        name: projectData.name,
+        bpm: projectData.bpm || 120,
+        masterVolume: projectData.master_volume || 80,
+        settings: projectSettings
+      },
+      tracks: formattedTracks,
+      blocks: formattedBlocks
+    };
+  } catch (error) {
+    console.error("Error fetching project data:", error);
+    throw error;
+  }
+};
 
-    // Set local user ID
-    dispatch({
-      type:    'SET_LOCAL_USER_ID',
-      payload: supabaseRealtimeService.getLocalUserId()
-    })
+const updateProject = async (
+  projectId: string,
+  data: {
+    name?: string;
+    bpm?: number;
+    masterVolume?: number;
+    settings?: ProjectSettings;
+  }
+) => {
+  try {
+    const updateData: any = {};
+    
+    if (data.name !== undefined) updateData.name = data.name;
+    if (data.bpm !== undefined) updateData.bpm = data.bpm;
+    if (data.masterVolume !== undefined) updateData.master_volume = data.masterVolume;
+    if (data.settings !== undefined) updateData.settings = data.settings;
+    
+    const { data: result, error } = await supabase
+      .from('projects')
+      .update(updateData)
+      .eq('id', projectId);
+      
+    if (error) throw error;
+    return result;
+  } catch (error) {
+    console.error("Error updating project:", error);
+    throw error;
+  }
+};
 
-    // Load history
-    const loadHistory = async () => {
-      const history = await supabaseRealtimeService.getMessageHistory()
-      history.forEach(message => {
-        dispatch({
-          type:    'ADD_HISTORY_ENTRY',
-          payload: {
-            ...message,
-            userName:  message.userId === supabaseRealtimeService.getLocalUserId() ? 'You' : 'Collaborator',
-            userColor: message.userId === supabaseRealtimeService.getLocalUserId() ? '#FF466A' : '#60A5FA'
-          }
-        })
+const createBlock = async (
+  projectId: string, 
+  trackId: string,
+  data: {
+    name: string;
+    startBeat: number;
+    lengthBeats: number;
+    volume?: number;
+    pitch?: number;
+    fileId?: string;
+  }
+) => {
+  try {
+    const { data: result, error } = await supabase
+      .from('audio_blocks')
+      .insert({
+        track_id: trackId,
+        name: data.name,
+        start_beat: data.startBeat,
+        length_beats: data.lengthBeats,
+        volume: data.volume || 1.0,
+        pitch: data.pitch || 0.0,
+        file_id: data.fileId
+      });
+      
+    if (error) throw error;
+    return result;
+  } catch (error) {
+    console.error("Error creating audio block:", error);
+    throw error;
+  }
+};
+
+const updateSettings = async (projectId: string, settings: ProjectSettings) => {
+  try {
+    const { data: project, error: fetchError } = await supabase
+      .from('projects')
+      .select('*')
+      .eq('id', projectId)
+      .single();
+      
+    if (fetchError) throw fetchError;
+    
+    // Parse existing settings or use default
+    let currentSettings: ProjectSettings = {
+      theme: 'dark',
+      snapToGrid: true,
+      gridSize: 1,
+      autoSave: true,
+      showCollaborators: true
+    };
+    
+    if (project.settings) {
+      try {
+        // If settings is a string, parse it, otherwise use as is
+        const parsedSettings = typeof project.settings === 'string' 
+          ? JSON.parse(project.settings) 
+          : project.settings;
+          
+        currentSettings = {
+          ...currentSettings,
+          ...parsedSettings
+        };
+      } catch (e) {
+        console.error("Failed to parse project settings:", e);
+      }
+    }
+    
+    // Merge with new settings
+    const updatedSettings: ProjectSettings = {
+      ...currentSettings,
+      ...settings
+    };
+    
+    // Update the project with the new settings
+    const { data: result, error: updateError } = await supabase
+      .from('projects')
+      .update({ 
+        settings: updatedSettings,
+        bpm: project.bpm || 120,
+        master_volume: project.master_volume || 80
       })
-    }
+      .eq('id', projectId);
+      
+    if (updateError) throw updateError;
+    return result;
+  } catch (error) {
+    console.error("Error updating project settings:", error);
+    throw error;
+  }
+};
 
-    loadHistory()
-  }, [ supabaseRealtimeService ])
-  // Save project to localStorage when it changes
+export const ProjectProvider = ({ children }: ProjectProviderProps) => {
+  const defaultSettings: ProjectSettings = {
+    theme: 'dark',
+    snapToGrid: true,
+    gridSize: 1,
+    autoSave: true,
+    showCollaborators: true,
+    userName: 'User'
+  };
+  
+  const [state, setState] = useState<ProjectState>({
+    localUserId: webSocketService.getLocalUserId(),
+    localUserName: webSocketService.getLocalUserName(),
+    projectId: null,
+    isConnected: false,
+    collaborators: [],
+    settings: defaultSettings,
+    history: []
+  });
+  
+  const [historyVisible, setHistoryVisible] = useState(false);
+  const [selectedHistoryIndex, setSelectedHistoryIndex] = useState<number | null>(null);
+  
   useEffect(() => {
-    if (state.id)
-      localStorage.setItem('currentProject', JSON.stringify(state))
-  }, [ state ])
-
-  // WebSocket event listeners
-  useEffect(() => {
-    // eslint-disable-next-line complexity
-    const handleMessage = (message: UserInteractionMessage) => {
-      // Add to history
-      dispatch({
-        type:    'ADD_HISTORY_ENTRY',
-        payload: {
-          ...message,
-          userName:  message.userId === supabaseRealtimeService.getLocalUserId() ? 'You' : 'Collaborator',
-          userColor: message.userId === supabaseRealtimeService.getLocalUserId() ? '#FF466A' : '#60A5FA'
-        }
-      })
-
-      // Process message based on action type
-      switch (message.action) {
-        case ActionType.UPDATE_TRACK:
-          if (message.params.trackId) {
-            const { trackId, ...trackChanges } = message.params
-            const updatedTrack = {
-              ...state.tracks[trackId],
-              ...trackChanges
-            }
-            dispatch({
-              type:    'UPDATE_TRACKS',
-              payload: { [trackId]: updatedTrack }
-            })
+    const handleConnected = (data: { userId: string, projectId: string }) => {
+      setState(prev => ({
+        ...prev,
+        isConnected: true,
+        projectId: data.projectId
+      }));
+    };
+    
+    const handlePresenceSync = (presenceState: any) => {
+      const collaborators = Object.values(presenceState)
+        .flat()
+        .filter((user: any) => user.userId !== state.localUserId)
+        .map((user: any) => ({
+          id: user.userId,
+          name: user.userName || 'Anonymous',
+          color: getRandomColor(user.userId),
+          position: { x: 0, y: 0 }
+        }));
+      
+      setState(prev => ({
+        ...prev,
+        collaborators
+      }));
+    };
+    
+    const handleCursorMove = (data: any) => {
+      if (data.userId === state.localUserId) return;
+      
+      setState(prev => {
+        const updatedCollaborators = prev.collaborators.map(collab => {
+          if (collab.id === data.userId) {
+            return {
+              ...collab,
+              position: { x: data.x, y: data.y }
+            };
           }
-          break
-        case ActionType.ADD_TRACK:
-          if (message.params.track) {
-            const newTrack = message.params.track as TrackInfo
-            dispatch({
-              type:    'UPDATE_TRACKS',
-              payload: { [newTrack.id]: newTrack }
-            })
-          }
-          break
-        case ActionType.REMOVE_TRACK:
-          if (message.params.trackId) {
-            const updatedTracks = { ...state.tracks }
-            delete updatedTracks[message.params.trackId]
-            dispatch({
-              type:    'UPDATE_TRACKS',
-              payload: updatedTracks
-            })
-          }
-          break
-        case ActionType.UPDATE_BLOCK:
-        case ActionType.MOVE_BLOCK:
-        case ActionType.RESIZE_BLOCK:
-          if (message.params.blockId) {
-            const { blockId, ...blockChanges } = message.params
-            const updatedBlock = {
-              ...state.blocks[blockId],
-              ...blockChanges
-            }
-            dispatch({
-              type:    'UPDATE_BLOCKS',
-              payload: { [blockId]: updatedBlock }
-            })
-          }
-          break
-        case ActionType.ADD_BLOCK:
-          if (message.params.block) {
-            const newBlock = message.params.block as BlockInfo
-            dispatch({
-              type:    'UPDATE_BLOCKS',
-              payload: { [newBlock.id]: newBlock }
-            })
-          }
-          break
-        case ActionType.REMOVE_BLOCK:
-          if (message.params.blockId) {
-            const updatedBlocks = { ...state.blocks }
-            delete updatedBlocks[message.params.blockId]
-            dispatch({
-              type:    'UPDATE_BLOCKS',
-              payload: updatedBlocks
-            })
-          }
-          break
-        case ActionType.ADD_MARKER:
-          if (message.params.marker) {
-            const newMarker = message.params.marker as MarkerInfo
-            dispatch({
-              type:    'UPDATE_MARKERS',
-              payload: { [newMarker.id]: newMarker }
-            })
-          }
-          break
-        case ActionType.UPDATE_MARKER:
-          if (message.params.markerId) {
-            const { markerId, ...markerChanges } = message.params
-            const updatedMarker = {
-              ...state.markers[markerId],
-              ...markerChanges
-            }
-            dispatch({
-              type:    'UPDATE_MARKERS',
-              payload: { [markerId]: updatedMarker }
-            })
-          }
-          break
-        case ActionType.REMOVE_MARKER:
-          if (message.params.markerId) {
-            const updatedMarkers = { ...state.markers }
-            delete updatedMarkers[message.params.markerId]
-            dispatch({
-              type:    'UPDATE_MARKERS',
-              payload: updatedMarkers
-            })
-          }
-          break
-        case ActionType.CHANGE_BPM:
-          if (typeof message.params.bpm === 'number')
-            dispatch({ type: 'SET_BPM', payload: message.params.bpm })
-          break
-        case ActionType.UPDATE_SETTINGS:
-          dispatch({ type: 'UPDATE_SETTINGS', payload: message.params })
-          break
-
-        // Handle other actions as needed
-      }
-    }
-
-    const handleRollback = (timestamp: number) => {
-      restoreToTimestamp(timestamp)
-    }
-
-    // Register event listeners
-    // Register event listeners
-    supabaseRealtimeService.on('message', handleMessage as unknown as EventListener)
-    // TODO: Implement rollback handling with Supabase if needed
-    // supabaseRealtimeService.on('rollback', handleRollback)
-
-    // Cleanup
+          return collab;
+        });
+        
+        return {
+          ...prev,
+          collaborators: updatedCollaborators
+        };
+      });
+    };
+    
+    const handleConnectionStatusChanged = (data: { status: 'connecting' | 'connected' | 'disconnected' }) => {
+      setState(prev => ({
+        ...prev,
+        isConnected: data.status === 'connected'
+      }));
+    };
+    
+    webSocketService.on('connected', handleConnected);
+    webSocketService.on('presenceSync', handlePresenceSync);
+    webSocketService.on('cursorMove', handleCursorMove);
+    webSocketService.on('connectionStatusChanged', handleConnectionStatusChanged);
+    
+    // Initialize connection status
+    setState(prev => ({
+      ...prev,
+      isConnected: webSocketService.isConnected()
+    }));
+    
     return () => {
-      supabaseRealtimeService.off('message', handleMessage as unknown as EventListener)
-      // TODO: Implement rollback handling with Supabase if needed
-      // supabaseRealtimeService.off('rollback', handleRollback)
+      webSocketService.off('connected', handleConnected);
+      webSocketService.off('presenceSync', handlePresenceSync);
+      webSocketService.off('cursorMove', handleCursorMove);
+      webSocketService.off('connectionStatusChanged', handleConnectionStatusChanged);
+    };
+  }, [state.localUserId]);
+  
+  const connectToProject = async (projectId: string) => {
+    try {
+      // Fetch project data from the database
+      const projectData = await fetchProjectData(projectId);
+      
+      // Connect to the WebSocket channel for this project
+      webSocketService.connectToProject(projectId);
+      
+      setState(prev => ({
+        ...prev,
+        projectId,
+        history: webSocketService.getMessageHistory() as ProjectHistoryEntry[]
+      }));
+    } catch (error) {
+      console.error("Failed to connect to project:", error);
+      throw error;
     }
-  }, [ state, supabaseRealtimeService ])
-
-  // Function to send messages via Supabase Realtime
-  const sendMessage = useCallback((action: ActionType, params: any, filePayload?: FilePayload): Promise<void> => supabaseRealtimeService.sendMessage(action, params, filePayload), [ supabaseRealtimeService ])
-
-  // Function to upload a file
-  const uploadFile = useCallback(async (file: File, onProgress?: (progress: number) => void): Promise<string> => new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    const transferId = `file-${Date.now()}-${Math.random().toString(36)
-      .substring(2, 9)}`
-    const chunkSize = 1024 * 1024 // 1MB chunks
-    const totalChunks = Math.ceil(file.size / chunkSize)
-    let currentChunk = 0
-
-    // Send initial file upload message
-    sendMessage(
-      ActionType.INITIATE_FILE_UPLOAD,
-      {
-        fileName: file.name,
-        fileType: file.type,
-        fileSize: file.size,
-        transferId
-      }
-    )
-
-    const readNextChunk = () => {
-      if (currentChunk >= totalChunks) {
-        // All chunks sent
-        // All chunks sent
-        // TODO: Implement file upload completion with Supabase Storage
-        // supabaseRealtimeService.completeFileUpload(transferId, file.name, file.type, file.size)
-        resolve(transferId)
-        return
-      }
-
-      const start = currentChunk * chunkSize
-      const end = Math.min(start + chunkSize, file.size)
-      const slice = file.slice(start, end)
-
-      reader.onload = e => {
-        if (e.target?.result instanceof ArrayBuffer) {
-          // TODO: Implement file chunk sending with Supabase Storage
-          // supabaseRealtimeService.sendFileChunk(
-          //   transferId,
-          //   currentChunk,
-          //   totalChunks,
-          //   e.target.result
-          // )
-
-          currentChunk++
-
-          if (onProgress)
-            onProgress(currentChunk / totalChunks * 100)
-
-          // Read the next chunk
-          readNextChunk()
-        }
-      }
-
-      reader.onerror = () => {
-        reject(new Error('Error reading file'))
-      }
-
-      reader.readAsArrayBuffer(slice)
+  };
+  
+  const disconnectFromProject = () => {
+    webSocketService.disconnectFromProject();
+    setState(prev => ({
+      ...prev,
+      projectId: null,
+      isConnected: false,
+      collaborators: [],
+      history: []
+    }));
+  };
+  
+  const sendMessage = (action: ActionType, params: any): string => {
+    return webSocketService.sendMessage(action, params);
+  };
+  
+  const updateProjectSettings = async (settings: Partial<ProjectSettings>) => {
+    if (!state.projectId) {
+      throw new Error("No project is currently active");
     }
+    
+    try {
+      await updateSettings(state.projectId, settings as ProjectSettings);
+      sendMessage(ActionType.UPDATE_SETTINGS, { settings });
+      
+      // Create a properly typed complete settings object
+      const updatedSettings: ProjectSettings = {
+        ...state.settings,
+        ...settings
+      };
+      
+      setState(prev => ({
+        ...prev,
+        settings: updatedSettings
+      }));
+    } catch (error) {
+      console.error("Failed to update project settings:", error);
+      throw error;
+    }
+  };
+  
+  const restoreToTimestamp = (timestamp: number) => {
+    if (!state.projectId) return;
+    
+    // Implementation to restore project state to a specific point in history
+    console.log(`Restoring project state to timestamp: ${timestamp}`);
+    
+    // In a real implementation, we would send a message to the server
+    // to restore the project state to the specified timestamp
+    sendMessage(ActionType.RESTORE_TO_TIMESTAMP, { timestamp });
+    
+    // Close the history drawer
+    setHistoryVisible(false);
+    setSelectedHistoryIndex(null);
+  };
+  
+  const updateUserName = (userName: string) => {
+    // Ensure we maintain all required settings properties
+    const updatedSettings: ProjectSettings = {
+      ...state.settings,
+      userName
+    };
+    
+    // Update user name in settings
+    setState(prev => ({
+      ...prev,
+      localUserName: userName,
+      settings: updatedSettings
+    }));
+    
+    // Update the user name in the WebSocket service
+    webSocketService.updateUserName(userName);
+    
+    // Save to project settings if connected to a project
+    if (state.projectId) {
+      updateProjectSettings({ userName });
+    }
+  };
+  
+  const sendGeneralMessage = (message: any) => {
+    webSocketService.sendGeneralMessage(message);
+  };
+  
+  return (
+    <ProjectContext.Provider 
+      value={{
+        state,
+        sendMessage,
+        connectToProject,
+        disconnectFromProject,
+        messageHistory: webSocketService.getMessageHistory(),
+        historyVisible,
+        setHistoryVisible,
+        updateProjectSettings,
+        selectedHistoryIndex,
+        setSelectedHistoryIndex,
+        restoreToTimestamp,
+        updateUserName,
+        sendGeneralMessage
+      }}
+    >
+      {children}
+    </ProjectContext.Provider>
+  );
+};
 
-    // Start reading chunks
-    readNextChunk()
-  }), [ sendMessage, supabaseRealtimeService ])
+// Helper function to generate a consistent color based on user ID
+const getRandomColor = (userId: string): string => {
+  // Simple hash function to convert userId to a number
+  let hash = 0;
+  for (let i = 0; i < userId.length; i++) {
+    hash = userId.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  
+  // Convert the hash to a color
+  const hue = Math.abs(hash) % 360;
+  return `hsl(${hue}, 70%, 65%)`;
+};
 
-  // Function to restore state to a particular timestamp
-  const restoreToTimestamp = useCallback((timestamp: number) => {
-    toast({
-      title:       'Restoring project state',
-      description: 'Rolling back to previous state...',
-    })
-
-    dispatch({ type: 'RESTORE_FROM_HISTORY', payload: timestamp })
-
-    setSelectedHistoryIndex(null)
-    setHistoryVisible(false)
-  }, [])
-
-  const value = useMemo(() => ({
-    state,
-    dispatch,
-    sendMessage,
-    uploadFile,
-    historyVisible,
-    setHistoryVisible,
-    restoreToTimestamp,
-    selectedHistoryIndex,
-    setSelectedHistoryIndex
-  }), [ state, dispatch, sendMessage, uploadFile, historyVisible, setHistoryVisible, restoreToTimestamp, selectedHistoryIndex, setSelectedHistoryIndex ])
-
-  return <ProjectContext.Provider value={ value }>
-    {children}
-  </ProjectContext.Provider>
-}
-
-// Custom hook for using the context
 export const useProject = (): ProjectContextType => {
-  const context = useContext(ProjectContext)
-  if (!context)
-    throw new Error('useProject must be used within a ProjectProvider')
-  return context
-}
+  const context = useContext(ProjectContext);
+  if (context === undefined) {
+    throw new Error('useProject must be used within a ProjectProvider');
+  }
+  return context;
+};

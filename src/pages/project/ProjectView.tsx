@@ -1,4 +1,7 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import { toast } from "@/hooks/use-toast";
+import { Loader2, AlertCircle } from 'lucide-react';
 import TrackList from '@/components/TrackList';
 import TrackBlock from '@/components/TrackBlock';
 import Timeline from '@/components/Timeline';
@@ -6,22 +9,129 @@ import SettingsDialog from '@/components/SettingsDialog';
 import RemoteUser from '@/components/RemoteUser';
 import ClipEditPopup from '@/components/ClipEditPopup';
 import ProjectHistoryDrawer from '@/components/ProjectHistoryDrawer';
-import { toast } from "@/hooks/use-toast";
 import { Button } from '@/components/ui/button';
 import { Record } from '@/components/Record';
 import { ToolType } from '@/components/ToolsMenu';
 import { useProject } from '@/contexts/ProjectContext';
+import { TrackInfo } from '@/components/TrackList';
+import { ActionType } from '@/types/collaborative';
 import { ui } from '@/styles/ui-classes';
 import ToolbarWithStatus from '@/components/ToolbarWithStatus';
-import { createSampleProject } from '@/utils/sampleProject';
-import { useNavigate } from 'react-router-dom';
-import { ActionType } from '@/types/collaborative';
-import { TrackInfo } from '@/components/TrackList';
+import { supabase } from '@/integrations/supabase/client';
 
-const Index = () => {
+// Fetch project data from Supabase
+const fetchProjectData = async (projectId: string) => {
+  try {
+    // Fetch project details
+    const { data: projectData, error: projectError } = await supabase
+      .from('projects')
+      .select('*')
+      .eq('id', projectId)
+      .single();
+
+    if (projectError) throw projectError;
+
+    if (!projectData) {
+      throw new Error('Project not found');
+    }
+
+    // Parse settings JSON from the database
+    let projectSettings = {
+      theme: 'dark',
+      snapToGrid: true,
+      gridSize: 1,
+      autoSave: true,
+      showCollaborators: true
+    };
+
+    if (projectData.settings) {
+      try {
+        // If settings is a string, parse it, otherwise use as is
+        const parsedSettings = typeof projectData.settings === 'string'
+          ? JSON.parse(projectData.settings)
+          : projectData.settings;
+
+        projectSettings = {
+          ...projectSettings, // Keep defaults
+          ...parsedSettings   // Override with stored settings
+        };
+      } catch (e) {
+        console.error("Failed to parse project settings:", e);
+      }
+    }
+
+    // Fetch tracks
+    const { data: tracksData, error: tracksError } = await supabase
+      .from('tracks')
+      .select('*')
+      .eq('project_id', projectId)
+      .order('created_at', { ascending: true });
+
+    if (tracksError) throw tracksError;
+
+    // Fetch audio blocks
+    const { data: blocksData, error: blocksError } = await supabase
+      .from('audio_blocks')
+      .select('*')
+      .in('track_id', tracksData?.map(track => track.id) || [])
+      .order('created_at', { ascending: true });
+
+    if (blocksError) throw blocksError;
+
+    // Transform tracks to match the application structure
+    const formattedTracks: TrackInfo[] = (tracksData || []).map(track => ({
+      id: track.id,
+      name: track.name,
+      color: track.color,
+      volume: track.volume,
+      muted: track.muted,
+      solo: track.solo,
+      armed: track.armed ?? false,
+      locked: track.locked ?? false,
+      lockedByUser: track.locked_by_user_id || null,
+      lockedByUserName: track.locked_by_name || null
+    }));
+
+    // Transform blocks to match the application structure
+    const formattedBlocks = (blocksData || []).map(block => {
+      const trackIndex = formattedTracks.findIndex(track => track.id === block.track_id);
+      return {
+        id: block.id,
+        track: trackIndex >= 0 ? trackIndex : 0, // Use track index, fallback to 0
+        startBeat: block.start_beat,
+        lengthBeats: block.length_beats,
+        name: block.name,
+        volume: block.volume,
+        pitch: block.pitch,
+        fileId: block.file_id
+      };
+    });
+
+    return {
+      id: projectData.id,
+      name: projectData.name,
+      bpm: projectData.bpm || 120,
+      masterVolume: projectData.master_volume || 80,
+      settings: projectSettings,
+      tracks: formattedTracks,
+      blocks: formattedBlocks
+    };
+  } catch (error) {
+    console.error("Error fetching project data:", error);
+    throw error;
+  }
+};
+
+const ProjectView: React.FC = () => {
+  const { projectId } = useParams<{ projectId: string }>();
+  const navigate = useNavigate();
   const {
     // State from context
     state,
+    // Actions from context
+    loadProject,
+    setProjectLoading,
+    setProjectError,
     // Playback actions
     play,
     pause,
@@ -58,30 +168,33 @@ const Index = () => {
     // History actions
     toggleHistoryDrawer,
     // Legacy support
-    sendGeneralMessage
+    connectToProject,
+    sendMessage,
+    sendGeneralMessage,
+
+    updateProjectSettings,
   } = useProject();
-  
-  const navigate = useNavigate();
-  
-  // Refs for DOM elements
-  const scrollContainerRef = useRef<HTMLDivElement>(null);
-  const timelineRef = useRef<HTMLDivElement>(null);
-  const trackListRef = useRef<HTMLDivElement>(null);
-  
+
   // Local UI state that doesn't belong in global context
   const [containerWidth, setContainerWidth] = useState(0);
   const [clipPopupPosition, setClipPopupPosition] = useState({ x: 0, y: 0 });
-  
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<Error | null>(null);
+
   // Drag and drop state
   const [isDragOver, setIsDragOver] = useState(false);
   const [dragPosition, setDragPosition] = useState<{x: number, y: number} | null>(null);
   const [placeholderBlock, setPlaceholderBlock] = useState<{track: number, startBeat: number, lengthBeats: number} | null>(null);
-  
+
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const timelineRef = useRef<HTMLDivElement>(null);
+  const trackListRef = useRef<HTMLDivElement>(null);
+
   // Derived values from context state
   const isPlaying = state.isPlaying;
   const bpm = state.project.bpm;
   const masterVolume = state.project.masterVolume;
-  const currentBeat = state.currentBeat;
+  const currentBeat = isNaN(state.currentBeat) ? 0 : state.currentBeat;
   const selectedBlockId = state.selectedBlockId;
   const isSettingsOpen = state.isSettingsOpen;
   const pixelsPerBeat = state.pixelsPerBeat;
@@ -96,72 +209,117 @@ const Index = () => {
   const showCollaborators = settings.showCollaborators;
   const horizontalScrollPosition = state.scrollPosition.horizontal;
   const verticalScrollPosition = state.scrollPosition.vertical;
-  
+
+  console.log(state)
+
   // Remote users from context collaborators
-  const remoteUsers = state.collaborators.map(collaborator => ({
+  const remoteUsers = state.remoteUsers.map(collaborator => ({
     id: collaborator.id,
     name: collaborator.name,
     position: collaborator.position,
     color: collaborator.color
   }));
-  
-  // Initialize with default tracks and blocks for demo
+
+  // Load project data when component mounts
   useEffect(() => {
-    if (tracks.length === 0) {
-      // Add default tracks
-      const defaultTracks = [
-        { name: 'Drums', color: '#FF466A', volume: 80, muted: false, solo: false, armed: false },
-        { name: 'Bass', color: '#FFB446', volume: 75, muted: false, solo: false, armed: false },
-        { name: 'Synth', color: '#64C850', volume: 70, muted: false, solo: false, armed: false },
-        { name: 'Vocals', color: '#5096FF', volume: 85, muted: false, solo: false, armed: false },
-      ];
-      
-      defaultTracks.forEach(trackData => {
-        addTrack(trackData);
-      });
-      
-      // Add default blocks after a brief delay to ensure tracks are created
-      setTimeout(() => {
-        const defaultBlocks = [
-          { name: 'Kick', track: 0, startBeat: 0, lengthBeats: 4, volume: 80, pitch: 0 },
-          { name: 'Snare', track: 0, startBeat: 8, lengthBeats: 4, volume: 75, pitch: 0 },
-          { name: 'Bass Line', track: 1, startBeat: 4, lengthBeats: 8, volume: 70, pitch: 0 },
-          { name: 'Synth Lead', track: 2, startBeat: 12, lengthBeats: 6, volume: 65, pitch: 0 },
-          { name: 'Vocal Chop', track: 3, startBeat: 16, lengthBeats: 8, volume: 85, pitch: 2 },
-        ];
-        
-        defaultBlocks.forEach(blockData => {
-          addBlock(blockData);
+    if (!projectId) return;
+
+    const loadProjectData = async () => {
+      try {
+        setIsLoading(true);
+        setProjectLoading(true);
+        setError(null);
+        setProjectError(null);
+
+        const projectData = await fetchProjectData(projectId);
+
+        // Load project data into context
+        loadProject(projectData);
+
+        // Connect to the project's WebSocket channel
+        connectToProject(projectData.id);
+
+        toast({
+          title: "Project Loaded",
+          description: `Successfully loaded "${projectData.name}"`,
         });
-      }, 100);
-    }
-  }, [tracks.length, addTrack, addBlock]);
+      } catch (err) {
+        console.error("Error loading project:", err);
+        const errorObj = err as Error;
+        setError(errorObj);
+        setProjectError(errorObj.message);
+
+        toast({
+          title: "Error Loading Project",
+          description: errorObj.message,
+          variant: "destructive",
+        });
+      } finally {
+        setIsLoading(false);
+        setProjectLoading(false);
+      }
+    };
+
+    loadProjectData();
+  }, [projectId, loadProject, connectToProject, setProjectLoading, setProjectError]);
+
+  const handleRetry = () => {
+    if (!projectId) return;
+
+    const loadProjectData = async () => {
+      try {
+        setIsLoading(true);
+        setProjectLoading(true);
+        setError(null);
+        setProjectError(null);
+
+        const projectData = await fetchProjectData(projectId);
+        loadProject(projectData);
+        connectToProject(projectData.id);
+
+        toast({
+          title: "Project Loaded",
+          description: `Successfully loaded "${projectData.name}"`,
+        });
+      } catch (err) {
+        console.error("Error loading project:", err);
+        const errorObj = err as Error;
+        setError(errorObj);
+        setProjectError(errorObj.message);
+      } finally {
+        setIsLoading(false);
+        setProjectLoading(false);
+      }
+    };
+
+    loadProjectData();
+  };
 
   // Helper functions for drag and drop
   const isAudioFile = (file: File): boolean => {
     const audioExtensions = ['.mp3', '.wav', '.ogg', '.m4a', '.aac', '.flac', '.wma'];
-    const fileName = file.name.toLowerCase();
-    return audioExtensions.some(ext => fileName.endsWith(ext));
+    const fileName = file?.name.toLowerCase();
+    return fileName ? audioExtensions.some(ext => fileName.endsWith(ext)) : false
   };
 
   const calculateDropPosition = (e: React.DragEvent<HTMLDivElement>) => {
     if (!scrollContainerRef.current) return null;
-    
+
     const rect = scrollContainerRef.current.getBoundingClientRect();
     const x = e.clientX - rect.left + horizontalScrollPosition;
     const y = e.clientY - rect.top + verticalScrollPosition;
-    
+
     const trackIndex = Math.floor(y / trackHeight);
     let beatPosition = x / pixelsPerBeat;
-    
+
     // Apply snapping if enabled
     if (settings.snapToGrid) {
       beatPosition = Math.round(beatPosition / settings.gridSize) * settings.gridSize;
     }
-    
+
     // Default block length (can be made configurable)
     const defaultLength = 4;
-    
+
     return {
       track: Math.max(0, Math.min(trackIndex, tracks.length - 1)),
       startBeat: Math.max(0, beatPosition),
@@ -169,7 +327,7 @@ const Index = () => {
     };
   };
 
-  // Event handlers using context actions
+  // Event handlers using context methods
   const handleDuplicate = (blockId: string) => {
     duplicateBlock(blockId);
     const block = blocks.find(b => b.id === blockId);
@@ -184,13 +342,13 @@ const Index = () => {
   const handleToggleLock = (blockId: string) => {
     const block = blocks.find(b => b.id === blockId);
     if (!block) return;
-    
+
     if (block.editingUserId) {
       endEditingBlock(blockId);
     } else {
       startEditingBlock(blockId);
     }
-    
+
     toast({
       title: "Block Lock Changed",
       description: "Block editing status has been updated.",
@@ -200,7 +358,7 @@ const Index = () => {
   const handleOpenProperties = (blockId: string) => {
     const block = blocks.find(block => block.id === blockId);
     if (!block) return;
-    
+
     if (block.editingUserId && block.editingUserId !== state.localUserId) {
       toast({
         title: "Block is being edited",
@@ -226,9 +384,9 @@ const Index = () => {
   };
 
   const isTrackLocked = (trackIndex: number): boolean => {
-    return blocks.some(block => 
-      block.track === trackIndex && 
-      block.editingUserId && 
+    return blocks.some(block =>
+      block.track === trackIndex &&
+      block.editingUserId &&
       block.editingUserId !== state.localUserId
     );
   };
@@ -252,8 +410,7 @@ const Index = () => {
 
     startEditingBlock(id);
     selectBlock(id);
-    
-    // Update clip popup position for UI
+
     if (scrollContainerRef.current && block) {
       const blockX = block.startBeat * pixelsPerBeat;
       const blockY = block.track * trackHeight;
@@ -267,18 +424,20 @@ const Index = () => {
 
   // Connection/initialization effect
   useEffect(() => {
+    if (!state.project) return;
+
     // Mark the track area with the project-area class for cursor tracking
     const trackArea = scrollContainerRef.current;
     if (trackArea) {
       trackArea.classList.add('project-area');
     }
-    
+
     // Send a general message to notify others that we've joined
     sendGeneralMessage({
       type: 'user_joined',
-      message: `${state.localUserName} joined the session`
+      message: `${state.localUserName} joined project "${state.project.name}"`
     });
-    
+
     // Listen for general messages
     const handleGeneralMessage = (message: any) => {
       if (message.type === 'user_joined' && message.userId !== state.localUserId) {
@@ -288,18 +447,18 @@ const Index = () => {
         });
       }
     };
-    
+
     const webSocketService = window.getWebSocketService?.();
     if (webSocketService) {
       webSocketService.on('generalMessage', handleGeneralMessage);
     }
-    
+
     return () => {
       if (webSocketService) {
         webSocketService.off('generalMessage', handleGeneralMessage);
       }
     };
-  }, []);
+  }, [state.project, state.localUserId, state.localUserName, sendGeneralMessage]);
 
   const handleBlockPositionChange = (id: string, newTrack: number, newStartBeat: number) => {
     if (isTrackLocked(newTrack)) {
@@ -315,10 +474,9 @@ const Index = () => {
     if (settings.snapToGrid) {
       adjustedStartBeat = Math.round(newStartBeat / settings.gridSize) * settings.gridSize;
     }
-    
+
     moveBlock(id, newTrack, adjustedStartBeat);
-    
-    // Notify other users about the block move
+
     sendGeneralMessage({
       type: 'block_moved',
       blockId: id,
@@ -331,10 +489,10 @@ const Index = () => {
   const handleBlockLengthChange = (id: string, newLength: number) => {
     let adjustedLength = newLength;
     if (settings.snapToGrid) {
-      adjustedLength = Math.max(settings.gridSize, 
+      adjustedLength = Math.max(settings.gridSize,
         Math.round(newLength / settings.gridSize) * settings.gridSize);
     }
-    
+
     resizeBlock(id, adjustedLength);
   };
 
@@ -388,7 +546,7 @@ const Index = () => {
         lockTrack(trackId);
       }
     }
-    
+
     toast({
       title: "Track Lock Changed",
       description: "Track locking status has been updated.",
@@ -397,7 +555,7 @@ const Index = () => {
 
   const handleTrackRename = (trackId: string, newName: string) => {
     renameTrack(trackId, newName);
-    
+
     toast({
       title: "Track Renamed",
       description: `Track has been renamed to "${newName}".`,
@@ -414,18 +572,18 @@ const Index = () => {
   const handleAddTrack = () => {
     const colors = ['#FF466A', '#FFB446', '#64C850', '#5096FF'];
     const newColor = colors[tracks.length % colors.length];
-    
-    const newTrackData = { 
-      name: `Track ${tracks.length + 1}`, 
-      color: newColor, 
-      volume: 75, 
-      muted: false, 
+
+    const newTrackData = {
+      name: `Track ${tracks.length + 1}`,
+      color: newColor,
+      volume: 75,
+      muted: false,
       solo: false,
       armed: false
     };
-    
+
     addTrack(newTrackData);
-    
+
     toast({
       title: "Track Added",
       description: "A new track has been added to your composition.",
@@ -447,7 +605,7 @@ const Index = () => {
   const handleDeleteBlock = (id: string) => {
     removeBlock(id);
     deselectBlock();
-    
+
     toast({
       title: "Clip Deleted",
       description: "The audio clip has been removed from your track.",
@@ -478,17 +636,16 @@ const Index = () => {
 
   useEffect(() => {
     if (!isPlaying) return;
-    
+
     const interval = setInterval(() => {
-      setCurrentBeat(prev => {
-        const totalBeats = totalBars * beatsPerBar;
-        const next = (prev + 0.1) % totalBeats;
-        return next;
-      });
+      const totalBeats = totalBars * beatsPerBar;
+      const next = (currentBeat + 0.1) % totalBeats;
+      setCurrentBeat(next);
     }, 60000 / bpm / 10);
-    
+
     return () => clearInterval(interval);
-  }, [isPlaying, bpm, beatsPerBar, totalBars]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isPlaying, bpm, beatsPerBar, totalBars, currentBeat]);
 
   const handleContainerClick = (e: React.MouseEvent) => {
     if (e.currentTarget === e.target) {
@@ -502,12 +659,12 @@ const Index = () => {
   const handleDragEnter = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     e.stopPropagation();
-    
+
     // Check if any files being dragged are audio files
-    const hasAudioFiles = Array.from(e.dataTransfer.items).some(item => 
+    const hasAudioFiles = Array.from(e.dataTransfer.items).some(item =>
       item.kind === 'file' && isAudioFile(item.getAsFile()!)
     );
-    
+
     if (hasAudioFiles) {
       setIsDragOver(true);
     }
@@ -516,9 +673,9 @@ const Index = () => {
   const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     e.stopPropagation();
-    
+
     if (!isDragOver) return;
-    
+
     const position = calculateDropPosition(e);
     if (position) {
       setPlaceholderBlock(position);
@@ -529,7 +686,7 @@ const Index = () => {
   const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     e.stopPropagation();
-    
+
     // Only clear drag state if leaving the container entirely
     if (!e.currentTarget.contains(e.relatedTarget as Node)) {
       setIsDragOver(false);
@@ -541,14 +698,14 @@ const Index = () => {
   const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     e.stopPropagation();
-    
+
     setIsDragOver(false);
     setPlaceholderBlock(null);
     setDragPosition(null);
-    
+
     const files = Array.from(e.dataTransfer.files);
     const audioFiles = files.filter(isAudioFile);
-    
+
     if (audioFiles.length === 0) {
       toast({
         title: "Invalid File Type",
@@ -557,10 +714,10 @@ const Index = () => {
       });
       return;
     }
-    
+
     const dropPosition = calculateDropPosition(e);
     if (!dropPosition) return;
-    
+
     // Create audio blocks for each dropped file
     audioFiles.forEach((file, index) => {
       const fileName = file.name.replace(/\.[^/.]+$/, ""); // Remove extension
@@ -573,10 +730,10 @@ const Index = () => {
         pitch: 0,
         fileId: `file-${Date.now()}-${index}` // Placeholder file ID
       };
-      
+
       addBlock(blockData);
     });
-    
+
     toast({
       title: "Audio Files Added",
       description: `Added ${audioFiles.length} audio block${audioFiles.length > 1 ? 's' : ''} to track ${dropPosition.track + 1}`,
@@ -599,8 +756,8 @@ const Index = () => {
 
   const getTrackEditingUserId = (trackIndex: number) => {
     return blocks.find(
-      block => block.track === trackIndex && 
-               block.editingUserId && 
+      block => block.track === trackIndex &&
+               block.editingUserId &&
                block.editingUserId !== state.localUserId
     )?.editingUserId || null;
   };
@@ -620,49 +777,49 @@ const Index = () => {
     };
   });
 
-  const selectedBlock = blocks.find(block => block.id === selectedBlockId);
+  const selectedBlock = useMemo(() => blocks.find(block => block.id === selectedBlockId), [ blocks, selectedBlockId ])
 
-  const handleCreateSampleProject = async () => {
-    try {
-      toast({
-        title: "Creating Sample Project",
-        description: "Setting up a sample project with tracks and audio blocks...",
-      });
+  // Error handling
+  if (error) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-background">
+        <div className="text-center space-y-4">
+          <AlertCircle className="h-12 w-12 text-destructive mx-auto" />
+          <h1 className="text-2xl font-bold text-foreground">Project Not Found</h1>
+          <p className="text-muted-foreground max-w-md">
+            The project you're looking for doesn't exist or you don't have permission to access it.
+          </p>
+          <div className="space-x-2">
+            <Button variant="outline" onClick={() => navigate('/')}>
+              Go Home
+            </Button>
+            <Button onClick={handleRetry}>
+              Try Again
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
-      const projectId = await createSampleProject();
-      
-      toast({
-        title: "Sample Project Created!",
-        description: "Navigating to your new project...",
-      });
-
-      // Navigate to the new project
-      navigate(`/project/${projectId}`);
-    } catch (error) {
-      console.error('Error creating sample project:', error);
-      toast({
-        title: "Error",
-        description: "Failed to create sample project. Please try again.",
-        variant: "destructive",
-      });
-    }
-  };
+  // Loading state
+  if (isLoading || !state.project.id) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-background">
+        <div className="text-center space-y-4">
+          <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto" />
+          <h2 className="text-xl font-semibold text-foreground">Loading Project...</h2>
+          <p className="text-muted-foreground">Fetching your audio project data</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className={ui.layout.fullScreen}>
       <div className={ui.overlay.gradient} />
-      
-      {/* Sample Project Button */}
-      <div className="absolute top-4 right-4 z-20">
-        <Button 
-          onClick={handleCreateSampleProject}
-          className="bg-primary hover:bg-primary/90"
-        >
-          Create Sample Project
-        </Button>
-      </div>
-      
-      <ToolbarWithStatus 
+
+      <ToolbarWithStatus
         isPlaying={isPlaying}
         bpm={bpm}
         volume={masterVolume}
@@ -681,9 +838,9 @@ const Index = () => {
         historyVisible={historyVisible}
         onToggleHistory={() => toggleHistoryDrawer(!historyVisible)}
       />
-      
+
       <div className="flex flex-grow overflow-hidden z-10">
-        <TrackList 
+        <TrackList
           ref={trackListRef}
           tracks={tracksWithLockInfo}
           onVolumeChange={handleTrackVolumeChange}
@@ -697,9 +854,9 @@ const Index = () => {
           onTrackListScroll={handleTrackListScroll}
           localUserId={state.localUserId}
         />
-        
+
         <div className="flex-grow overflow-hidden flex flex-col">
-          <Timeline 
+          <Timeline
             ref={timelineRef}
             width={containerWidth}
             pixelsPerBeat={pixelsPerBeat}
@@ -714,8 +871,8 @@ const Index = () => {
             onSeek={handleSeek}
             scrollLeft={horizontalScrollPosition}
           />
-          
-          <div 
+
+          <div
             ref={scrollContainerRef}
             className={`${ui.layout.growContainer} project-area ${isDragOver ? 'bg-primary/5' : ''}`}
             onClick={handleContainerClick}
@@ -726,9 +883,9 @@ const Index = () => {
             onDragLeave={handleDragLeave}
             onDrop={handleDrop}
           >
-            <div 
+            <div
               className="absolute inset-0"
-              style={{ 
+              style={{
                 width: `${totalBars * beatsPerBar * pixelsPerBeat}px`,
                 minHeight: `${tracks.length * trackHeight}px`
               }}
@@ -736,17 +893,17 @@ const Index = () => {
               {tracks.map((_, index) => {
                 const editingUserId = getTrackEditingUserId(index);
                 const userColor = getUserColor(editingUserId);
-                
+
                 return (
                   <div key={index} className="track-edited-by-user absolute left-0 right-0">
-                    <div 
+                    <div
                       className="absolute left-0 right-0 border-b border-border"
-                      style={{ 
+                      style={{
                         top: `${(index + 1) * trackHeight}px`,
                       }}
                     />
                     {editingUserId && (
-                      <div 
+                      <div
                         className="absolute pointer-events-none"
                         style={{
                           top: `${index * trackHeight}px`,
@@ -780,9 +937,8 @@ const Index = () => {
                 </div>
               )}
 
-              {/* Enhanced blocks with drag-and-drop */}
               {blocks.map(block => (
-                <TrackBlock 
+                <TrackBlock
                   key={block.id}
                   id={block.id}
                   track={block.track}
@@ -811,9 +967,9 @@ const Index = () => {
                 />
               ))}
 
-              <div 
+              <div
                 className="playhead"
-                style={{ 
+                style={{
                   left: `${currentBeat * pixelsPerBeat}px`,
                   height: '100%',
                   position: 'absolute',
@@ -825,11 +981,11 @@ const Index = () => {
         </div>
       </div>
 
-      <ProjectHistoryDrawer 
+      <ProjectHistoryDrawer
         open={historyVisible}
         onOpenChange={toggleHistoryDrawer}
       />
-      
+
       <SettingsDialog
         open={isSettingsOpen}
         onOpenChange={toggleSettings}
@@ -856,8 +1012,18 @@ const Index = () => {
           }}
         />
       )}
+
+      {showCollaborators && remoteUsers.map(user => (
+        <RemoteUser
+          key={user.id}
+          id={user.id}
+          name={user.name}
+          position={user.position}
+          color={user.color}
+        />
+      ))}
     </div>
   );
 };
 
-export default Index;
+export default ProjectView;

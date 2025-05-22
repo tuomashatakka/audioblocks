@@ -9,6 +9,7 @@ import { ProjectProvider } from "@/contexts/ProjectContext";
 import WebSocketService from "@/utils/WebSocketService";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
+import ProjectView from "./pages/project/ProjectView";
 
 // Create a new QueryClient instance
 const queryClient = new QueryClient();
@@ -41,6 +42,7 @@ const App: React.FC = () => {
             <BrowserRouter>
               <Routes>
                 <Route path="/" element={<Index />} />
+                <Route path="/project/:projectId" element={<ProjectView />} />
                 {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                 <Route path="*" element={<NotFound />} />
               </Routes>

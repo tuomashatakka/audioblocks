@@ -18,7 +18,7 @@ export const ui = {
     dragging: "opacity-70",
     locked: "opacity-70 cursor-not-allowed",
     movable: "cursor-move",
-    waveform: "bg-primary/60 rounded-sm mx-px",
+    waveform: "bg-primary/60",
     resizeHandle: "absolute right-0 top-0 bottom-0 w-2 cursor-col-resize",
   },
   overlay: {

@@ -352,20 +352,20 @@ class WebSocketService extends EventEmitter {
       });
 
       // Also update in the database for users who join later
-      supabase.from('user_presence').upsert({
-        project_id: this.currentProjectId,
-        user_id: this.localUserId,
-        user_name: this.localUserName,
-        cursor_x: Math.round(x),
-        cursor_y: Math.round(y),
-        last_active: new Date().toISOString()
-      }, {
-        onConflict: 'user_id,project_id'
-      }).then(() => {
-        // No need to handle response
-      });
+      // supabase.from('user_presence').upsert({
+      //   project_id: this.currentProjectId,
+      //   user_id: this.localUserId,
+      //   user_name: this.localUserName,
+      //   cursor_x: Math.round(x),
+      //   cursor_y: Math.round(y),
+      //   last_active: new Date().toISOString()
+      // }, {
+      //   onConflict: 'user_id,project_id'
+      // }).then(() => {
+      //   // No need to handle response
+      // });
     }
-  }, 50);
+  }, 150);
 
   public sendMessage(action: ActionType, params: RealtimeMessagePayload, filePayload?: FilePayload): string {
     const messageId = `msg-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;

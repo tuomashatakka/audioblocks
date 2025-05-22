@@ -1,53 +1,92 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useReducer, useEffect, ReactNode, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import WebSocketService from '@/utils/WebSocketService';
-import { ActionType, UserInteractionMessage, ProjectHistoryEntry } from '@/types/collaborative';
-
-interface ProjectState {
-  localUserId: string;
-  localUserName: string;
-  projectId: string | null;
-  isConnected: boolean;
-  collaborators: {
-    id: string;
-    name: string;
-    color: string;
-    position: { x: number; y: number };
-  }[];
-  settings: {
-    theme: 'light' | 'dark';
-    snapToGrid: boolean;
-    gridSize: number;
-    autoSave: boolean;
-    showCollaborators: boolean;
-    userName?: string;
-    [key: string]: string | number | boolean | undefined;
-  };
-  history: ProjectHistoryEntry[];
-}
-
-interface ProjectSettings {
-  theme: 'light' | 'dark';
-  snapToGrid: boolean;
-  gridSize: number;
-  autoSave: boolean;
-  showCollaborators: boolean;
-  userName?: string;
-  [key: string]: string | number | boolean | undefined; // Index signature to allow additional properties
-}
+import { ActionType, UserInteractionMessage } from '@/types/collaborative';
+import { 
+  ProjectState, 
+  ProjectHistoryEntry, 
+  Track, 
+  Block, 
+  ProjectSettings,
+  initialProjectState,
+  projectReducer
+} from './projectReducer';
+import {
+  ProjectActionType,
+  playbackActions,
+  trackActions,
+  blockActions,
+  uiActions,
+  createProjectAction,
+  LoadProjectAction,
+  SetProjectLoadingAction,
+  SetProjectErrorAction,
+  UpdateProjectSettingsAction,
+  ToggleHistoryDrawerAction,
+  RestoreToTimestampAction
+} from './projectActions';
+import { ToolType } from '@/components/ToolsMenu';
 
 interface ProjectContextType {
+  // State
   state: ProjectState;
-  sendMessage: (action: ActionType, params: any) => string;
+  
+  // Project Management
+  loadProject: (projectData: any) => void;
+  setProjectLoading: (loading: boolean) => void;
+  setProjectError: (error: string | null) => void;
+  updateProjectSettings: (settings: Partial<ProjectSettings>) => Promise<void>;
+  
+  // Playback Actions
+  play: () => void;
+  pause: () => void;
+  restart: () => void;
+  setCurrentBeat: (beat: number) => void;
+  setBpm: (bpm: number) => void;
+  setMasterVolume: (volume: number) => void;
+  
+  // Track Actions
+  addTrack: (track: Omit<Track, 'id'>) => Promise<void>;
+  removeTrack: (trackId: string) => void;
+  renameTrack: (trackId: string, name: string) => void;
+  setTrackVolume: (trackId: string, volume: number) => void;
+  muteTrack: (trackId: string, muted: boolean) => void;
+  soloTrack: (trackId: string, solo: boolean) => void;
+  armTrack: (trackId: string, armed: boolean) => void;
+  lockTrack: (trackId: string) => void;
+  unlockTrack: (trackId: string) => void;
+  
+  // Block Actions
+  addBlock: (block: Omit<Block, 'id'>) => void;
+  removeBlock: (blockId: string) => void;
+  updateBlock: (blockId: string, updates: Partial<Block>) => void;
+  moveBlock: (blockId: string, track: number, startBeat: number) => void;
+  resizeBlock: (blockId: string, lengthBeats: number) => void;
+  duplicateBlock: (blockId: string) => void;
+  startEditingBlock: (blockId: string) => void;
+  endEditingBlock: (blockId: string) => void;
+  
+  // UI Actions
+  selectBlock: (blockId: string) => void;
+  deselectBlock: () => void;
+  setActiveTool: (tool: ToolType) => void;
+  setZoom: (pixelsPerBeat: number) => void;
+  setScrollPosition: (horizontal: number, vertical: number) => void;
+  toggleSettings: (open: boolean) => void;
+  
+  // History Actions
+  toggleHistoryDrawer: (open: boolean) => void;
+  restoreToTimestamp: (timestamp: number) => void;
+  
+  // Legacy support for existing code
   connectToProject: (projectId: string) => Promise<void>;
   disconnectFromProject: () => void;
+  sendMessage: (action: ActionType, params: any) => string;
   messageHistory: UserInteractionMessage[];
   historyVisible: boolean;
   setHistoryVisible: (visible: boolean) => void;
-  updateProjectSettings: (settings: Partial<ProjectSettings>) => Promise<void>;
   selectedHistoryIndex: number | null;
   setSelectedHistoryIndex: (index: number | null) => void;
-  restoreToTimestamp: (timestamp: number) => void;
   updateUserName: (name: string) => void;
   sendGeneralMessage: (message: any) => void;
 }
@@ -277,35 +316,491 @@ const updateSettings = async (projectId: string, settings: ProjectSettings) => {
 };
 
 export const ProjectProvider = ({ children }: ProjectProviderProps) => {
-  const defaultSettings: ProjectSettings = {
-    theme: 'dark',
-    snapToGrid: true,
-    gridSize: 1,
-    autoSave: true,
-    showCollaborators: true,
-    userName: 'User'
-  };
-  
-  const [state, setState] = useState<ProjectState>({
+  // Initialize state with user info from WebSocket service
+  const [state, dispatch] = useReducer(projectReducer, {
+    ...initialProjectState,
     localUserId: webSocketService.getLocalUserId(),
     localUserName: webSocketService.getLocalUserName(),
-    projectId: null,
-    isConnected: false,
-    collaborators: [],
-    settings: defaultSettings,
-    history: []
   });
-  
-  const [historyVisible, setHistoryVisible] = useState(false);
-  const [selectedHistoryIndex, setSelectedHistoryIndex] = useState<number | null>(null);
-  
+
+  // Helper function to get current user info
+  const getCurrentUser = useCallback(() => ({
+    userId: state.localUserId,
+    userName: state.localUserName,
+  }), [state.localUserId, state.localUserName]);
+
+  // Project Management Actions
+  const loadProject = useCallback((projectData: any) => {
+    const action = createProjectAction<LoadProjectAction>(
+      ProjectActionType.LOAD_PROJECT,
+      {
+        id: projectData.id,
+        name: projectData.name,
+        bpm: projectData.bpm,
+        masterVolume: projectData.masterVolume,
+        settings: projectData.settings,
+        tracks: projectData.tracks,
+        blocks: projectData.blocks
+      },
+      { trackable: false }
+    );
+    dispatch(action);
+  }, []);
+
+  const setProjectLoading = useCallback((loading: boolean) => {
+    const action = createProjectAction<SetProjectLoadingAction>(
+      ProjectActionType.SET_PROJECT_LOADING,
+      { loading },
+      { trackable: false }
+    );
+    dispatch(action);
+  }, []);
+
+  const setProjectError = useCallback((error: string | null) => {
+    const action = createProjectAction<SetProjectErrorAction>(
+      ProjectActionType.SET_PROJECT_ERROR,
+      { error },
+      { trackable: false }
+    );
+    dispatch(action);
+  }, []);
+
+  const updateProjectSettings = useCallback(async (settings: Partial<ProjectSettings>) => {
+    if (!state.project.id) {
+      throw new Error("No project is currently active");
+    }
+
+    try {
+      const action = createProjectAction<UpdateProjectSettingsAction>(
+        ProjectActionType.UPDATE_PROJECT_SETTINGS,
+        { settings },
+        { 
+          ...getCurrentUser(),
+          description: `Updated project settings`,
+        }
+      );
+      dispatch(action);
+      
+      sendMessage(ActionType.UPDATE_SETTINGS, { settings });
+    } catch (error) {
+      console.error("Failed to update project settings:", error);
+      throw error;
+    }
+  }, [state.project.id, getCurrentUser]);
+
+  // Playback Actions
+  const play = useCallback(() => {
+    const { userId, userName } = getCurrentUser();
+    const action = playbackActions.play(userId, userName);
+    dispatch(action);
+    sendMessage(ActionType.PLAY, {});
+  }, [getCurrentUser]);
+
+  const pause = useCallback(() => {
+    const { userId, userName } = getCurrentUser();
+    const action = playbackActions.pause(userId, userName);
+    dispatch(action);
+    sendMessage(ActionType.PAUSE, {});
+  }, [getCurrentUser]);
+
+  const restart = useCallback(() => {
+    const { userId, userName } = getCurrentUser();
+    const action = playbackActions.restart(userId, userName);
+    dispatch(action);
+    sendMessage(ActionType.RESTART, {});
+  }, [getCurrentUser]);
+
+  const setCurrentBeat = useCallback((beat: number) => {
+    const action = createProjectAction(
+      ProjectActionType.SET_CURRENT_BEAT,
+      { beat },
+      { trackable: false }
+    );
+    dispatch(action);
+  }, []);
+
+  const setBpm = useCallback((bpm: number) => {
+    const { userId, userName } = getCurrentUser();
+    const action = playbackActions.setBpm(bpm, userId, userName);
+    dispatch(action);
+    sendMessage(ActionType.UPDATE_SETTINGS, { bpm });
+  }, [getCurrentUser]);
+
+  const setMasterVolume = useCallback((volume: number) => {
+    const { userId, userName } = getCurrentUser();
+    const action = playbackActions.setMasterVolume(volume, userId, userName);
+    dispatch(action);
+    sendMessage(ActionType.UPDATE_SETTINGS, { masterVolume: volume });
+  }, [getCurrentUser]);
+
+  // Track Actions
+  const addTrack = useCallback(async (trackData: Omit<Track, 'id'>) => {
+    if (!state.project.id) return;
+
+    const { userId, userName } = getCurrentUser();
+    
+    try {
+      const { data: newTrackData, error } = await supabase
+        .from('tracks')
+        .insert({
+          name: trackData.name,
+          color: trackData.color,
+          volume: trackData.volume,
+          muted: trackData.muted,
+          solo: trackData.solo,
+          armed: trackData.armed,
+          project_id: state.project.id
+        })
+        .select()
+        .single();
+        
+      if (error) throw error;
+      
+      const newTrack: Track = { 
+        id: newTrackData.id, 
+        ...trackData
+      };
+      
+      const action = trackActions.addTrack(newTrack, userId, userName);
+      dispatch(action);
+      sendMessage(ActionType.ADD_TRACK, { track: newTrack });
+    } catch (error) {
+      console.error('Error adding track:', error);
+      throw error;
+    }
+  }, [state.project.id, getCurrentUser]);
+
+  const removeTrack = useCallback((trackId: string) => {
+    const { userId, userName } = getCurrentUser();
+    const track = state.tracks.find(t => t.id === trackId);
+    const trackName = track?.name || 'Unknown';
+    
+    const action = trackActions.removeTrack(trackId, trackName, userId, userName);
+    dispatch(action);
+    sendMessage(ActionType.REMOVE_TRACK, { trackId });
+  }, [state.tracks, getCurrentUser]);
+
+  const renameTrack = useCallback((trackId: string, name: string) => {
+    const { userId, userName } = getCurrentUser();
+    const track = state.tracks.find(t => t.id === trackId);
+    const oldName = track?.name || 'Unknown';
+    
+    const action = trackActions.renameTrack(trackId, name, oldName, userId, userName);
+    dispatch(action);
+    sendMessage(ActionType.RENAME_TRACK, { trackId, name });
+  }, [state.tracks, getCurrentUser]);
+
+  const setTrackVolume = useCallback((trackId: string, volume: number) => {
+    const { userId, userName } = getCurrentUser();
+    const track = state.tracks.find(t => t.id === trackId);
+    const trackName = track?.name || 'Unknown';
+    
+    const action = trackActions.setTrackVolume(trackId, volume, trackName, userId, userName);
+    dispatch(action);
+    sendMessage(ActionType.SET_TRACK_VOLUME, { trackId, volume });
+  }, [state.tracks, getCurrentUser]);
+
+  const muteTrack = useCallback((trackId: string, muted: boolean) => {
+    const { userId, userName } = getCurrentUser();
+    const track = state.tracks.find(t => t.id === trackId);
+    const trackName = track?.name || 'Unknown';
+    
+    const action = trackActions.muteTrack(trackId, muted, trackName, userId, userName);
+    dispatch(action);
+    sendMessage(ActionType.MUTE_TRACK, { trackId, muted });
+  }, [state.tracks, getCurrentUser]);
+
+  const soloTrack = useCallback((trackId: string, solo: boolean) => {
+    const { userId, userName } = getCurrentUser();
+    const track = state.tracks.find(t => t.id === trackId);
+    const trackName = track?.name || 'Unknown';
+    
+    const action = trackActions.soloTrack(trackId, solo, trackName, userId, userName);
+    dispatch(action);
+    sendMessage(ActionType.SOLO_TRACK, { trackId, solo });
+  }, [state.tracks, getCurrentUser]);
+
+  const armTrack = useCallback((trackId: string, armed: boolean) => {
+    const { userId, userName } = getCurrentUser();
+    const track = state.tracks.find(t => t.id === trackId);
+    const trackName = track?.name || 'Unknown';
+    
+    const action = trackActions.armTrack(trackId, armed, trackName, userId, userName);
+    dispatch(action);
+    sendMessage(ActionType.ARM_TRACK, { trackId, armed });
+  }, [state.tracks, getCurrentUser]);
+
+  const lockTrack = useCallback((trackId: string) => {
+    const { userId, userName } = getCurrentUser();
+    const track = state.tracks.find(t => t.id === trackId);
+    const trackName = track?.name || 'Unknown';
+    
+    const action = trackActions.lockTrack(trackId, trackName, userId, userName);
+    dispatch(action);
+    sendMessage(ActionType.LOCK_TRACK, { trackId, userId });
+    webSocketService.lockTrack(trackId);
+  }, [state.tracks, getCurrentUser]);
+
+  const unlockTrack = useCallback((trackId: string) => {
+    const { userId, userName } = getCurrentUser();
+    const track = state.tracks.find(t => t.id === trackId);
+    const trackName = track?.name || 'Unknown';
+    
+    const action = trackActions.unlockTrack(trackId, trackName, userId, userName);
+    dispatch(action);
+    sendMessage(ActionType.UNLOCK_TRACK, { trackId });
+    webSocketService.unlockTrack(trackId);
+  }, [state.tracks, getCurrentUser]);
+
+  // Block Actions
+  const addBlock = useCallback((blockData: Omit<Block, 'id'>) => {
+    const { userId, userName } = getCurrentUser();
+    const blockId = `block-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    const block: Block = { id: blockId, ...blockData };
+    const trackName = state.tracks[blockData.track]?.name || 'Unknown';
+    
+    const action = blockActions.addBlock(block, trackName, userId, userName);
+    dispatch(action);
+    sendMessage(ActionType.ADD_BLOCK, { block });
+  }, [state.tracks, getCurrentUser]);
+
+  const removeBlock = useCallback((blockId: string) => {
+    const { userId, userName } = getCurrentUser();
+    const block = state.blocks.find(b => b.id === blockId);
+    const blockName = block?.name || 'Unknown';
+    
+    const action = blockActions.removeBlock(blockId, blockName, userId, userName);
+    dispatch(action);
+    sendMessage(ActionType.REMOVE_BLOCK, { blockId });
+  }, [state.blocks, getCurrentUser]);
+
+  const updateBlock = useCallback((blockId: string, updates: Partial<Block>) => {
+    const { userId, userName } = getCurrentUser();
+    const block = state.blocks.find(b => b.id === blockId);
+    const blockName = block?.name || 'Unknown';
+    
+    const action = blockActions.updateBlock(blockId, updates, blockName, userId, userName);
+    dispatch(action);
+    sendMessage(ActionType.UPDATE_BLOCK, { blockId, ...updates });
+  }, [state.blocks, getCurrentUser]);
+
+  const moveBlock = useCallback((blockId: string, track: number, startBeat: number) => {
+    const { userId, userName } = getCurrentUser();
+    const block = state.blocks.find(b => b.id === blockId);
+    const blockName = block?.name || 'Unknown';
+    
+    const action = blockActions.moveBlock(blockId, track, startBeat, blockName, userId, userName);
+    dispatch(action);
+    sendMessage(ActionType.MOVE_BLOCK, { blockId, trackId: track, startBeat });
+  }, [state.blocks, getCurrentUser]);
+
+  const resizeBlock = useCallback((blockId: string, lengthBeats: number) => {
+    const { userId, userName } = getCurrentUser();
+    const block = state.blocks.find(b => b.id === blockId);
+    const blockName = block?.name || 'Unknown';
+    
+    const action = blockActions.resizeBlock(blockId, lengthBeats, blockName, userId, userName);
+    dispatch(action);
+    sendMessage(ActionType.RESIZE_BLOCK, { blockId, lengthBeats });
+  }, [state.blocks, getCurrentUser]);
+
+  const duplicateBlock = useCallback((blockId: string) => {
+    const { userId, userName } = getCurrentUser();
+    const block = state.blocks.find(b => b.id === blockId);
+    if (!block) return;
+    
+    const newBlockId = `block-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    const newBlock = {
+      ...block,
+      id: newBlockId,
+      startBeat: block.startBeat + block.lengthBeats,
+      name: `${block.name} (copy)`
+    };
+    
+    const action = blockActions.duplicateBlock(blockId, newBlock, userId, userName);
+    dispatch(action);
+    sendMessage(ActionType.DUPLICATE_BLOCK, { 
+      originalBlockId: blockId,
+      newBlockId: newBlockId,
+      newStartBeat: newBlock.startBeat
+    });
+  }, [state.blocks, getCurrentUser]);
+
+  const startEditingBlock = useCallback((blockId: string) => {
+    const { userId, userName } = getCurrentUser();
+    const block = state.blocks.find(b => b.id === blockId);
+    const blockName = block?.name || 'Unknown';
+    
+    const action = blockActions.startEditingBlock(blockId, blockName, userId, userName);
+    dispatch(action);
+    sendMessage(ActionType.START_EDITING_BLOCK, { blockId });
+  }, [state.blocks, getCurrentUser]);
+
+  const endEditingBlock = useCallback((blockId: string) => {
+    const { userId, userName } = getCurrentUser();
+    const block = state.blocks.find(b => b.id === blockId);
+    const blockName = block?.name || 'Unknown';
+    
+    const action = blockActions.endEditingBlock(blockId, blockName, userId, userName);
+    dispatch(action);
+    sendMessage(ActionType.END_EDITING_BLOCK, { blockId });
+  }, [state.blocks, getCurrentUser]);
+
+  // UI Actions
+  const selectBlock = useCallback((blockId: string) => {
+    const action = uiActions.selectBlock(blockId);
+    dispatch(action);
+  }, []);
+
+  const deselectBlock = useCallback(() => {
+    const action = uiActions.deselectBlock();
+    dispatch(action);
+  }, []);
+
+  const setActiveTool = useCallback((tool: ToolType) => {
+    const action = uiActions.setActiveTool(tool);
+    dispatch(action);
+  }, []);
+
+  const setZoom = useCallback((pixelsPerBeat: number) => {
+    const action = uiActions.setZoom(pixelsPerBeat);
+    dispatch(action);
+  }, []);
+
+  const setScrollPosition = useCallback((horizontal: number, vertical: number) => {
+    const action = uiActions.setScrollPosition(horizontal, vertical);
+    dispatch(action);
+  }, []);
+
+  const toggleSettings = useCallback((open: boolean) => {
+    const action = createProjectAction(
+      ProjectActionType.TOGGLE_SETTINGS,
+      { open },
+      { trackable: false }
+    );
+    dispatch(action);
+  }, []);
+
+  // History Actions
+  const toggleHistoryDrawer = useCallback((open: boolean) => {
+    const action = createProjectAction<ToggleHistoryDrawerAction>(
+      ProjectActionType.TOGGLE_HISTORY_DRAWER,
+      { open },
+      { trackable: false }
+    );
+    dispatch(action);
+  }, []);
+
+  const restoreToTimestamp = useCallback((timestamp: number) => {
+    const { userId, userName } = getCurrentUser();
+    const action = createProjectAction<RestoreToTimestampAction>(
+      ProjectActionType.RESTORE_TO_TIMESTAMP,
+      { timestamp },
+      {
+        userId,
+        userName,
+        description: `Restored project to timestamp ${new Date(timestamp).toLocaleString()}`,
+      }
+    );
+    dispatch(action);
+    sendMessage(ActionType.RESTORE_TO_TIMESTAMP, { timestamp });
+  }, [getCurrentUser]);
+
+  // Legacy support functions for existing code
+  const connectToProject = useCallback(async (projectId: string) => {
+    try {
+      webSocketService.connectToProject(projectId);
+      
+      // Update local state
+      const action = createProjectAction(
+        ProjectActionType.UPDATE_PROJECT_SETTINGS,
+        { settings: { projectId } },
+        { trackable: false }
+      );
+      dispatch(action);
+    } catch (error) {
+      console.error("Failed to connect to project:", error);
+      throw error;
+    }
+  }, []);
+
+  const disconnectFromProject = useCallback(() => {
+    webSocketService.disconnectFromProject();
+    
+    // Reset project state
+    const action = createProjectAction(
+      ProjectActionType.LOAD_PROJECT,
+      {
+        id: null,
+        name: null,
+        bpm: 120,
+        masterVolume: 80,
+        settings: initialProjectState.project.settings,
+        tracks: [],
+        blocks: []
+      },
+      { trackable: false }
+    );
+    dispatch(action);
+  }, []);
+
+  const sendMessage = useCallback((action: ActionType, params: any): string => {
+    return webSocketService.sendMessage(action, params);
+  }, []);
+
+  const sendGeneralMessage = useCallback((message: any) => {
+    webSocketService.sendGeneralMessage(message);
+  }, []);
+
+  const updateUserName = useCallback((userName: string) => {
+    const action = createProjectAction(
+      ProjectActionType.UPDATE_USER_PRESENCE,
+      { 
+        userId: state.localUserId,
+        userName,
+        connected: state.isConnected
+      },
+      { trackable: false }
+    );
+    dispatch(action);
+    
+    webSocketService.updateUserName(userName);
+  }, [state.localUserId, state.isConnected]);
+
+  // Legacy state mappings
+  const messageHistory: UserInteractionMessage[] = webSocketService.getMessageHistory();
+  const historyVisible = state.historyVisible;
+  const setHistoryVisible = toggleHistoryDrawer;
+  const selectedHistoryIndex = state.selectedHistoryIndex;
+  const setSelectedHistoryIndex = useCallback((index: number | null) => {
+    const action = createProjectAction(
+      ProjectActionType.ADD_HISTORY_ENTRY,
+      {
+        id: `selection-${Date.now()}`,
+        timestamp: Date.now(),
+        action: 'SELECT_HISTORY',
+        description: `Selected history entry ${index}`,
+        userId: state.localUserId,
+        userName: state.localUserName,
+        details: { selectedIndex: index }
+      },
+      { trackable: false }
+    );
+    dispatch(action);
+  }, [state.localUserId, state.localUserName]);
+
+  // WebSocket event handlers
   useEffect(() => {
     const handleConnected = (data: { userId: string, projectId: string }) => {
-      setState(prev => ({
-        ...prev,
-        isConnected: true,
-        projectId: data.projectId
-      }));
+      const action = createProjectAction(
+        ProjectActionType.UPDATE_USER_PRESENCE,
+        {
+          userId: data.userId,
+          connected: true
+        },
+        { trackable: false }
+      );
+      dispatch(action);
     };
     
     const handlePresenceSync = (presenceState: any) => {
@@ -315,54 +810,56 @@ export const ProjectProvider = ({ children }: ProjectProviderProps) => {
         .map((user: any) => ({
           id: user.userId,
           name: user.userName || 'Anonymous',
-          color: getRandomColor(user.userId),
+          color: generateUserColor(user.userId),
           position: { x: 0, y: 0 }
         }));
       
-      setState(prev => ({
-        ...prev,
-        collaborators
-      }));
+      // Update remote users
+      collaborators.forEach((user: any) => {
+        const action = createProjectAction(
+          ProjectActionType.USER_JOINED,
+          {
+            userId: user.id,
+            userName: user.name,
+            color: user.color,
+            position: user.position
+          },
+          { trackable: false }
+        );
+        dispatch(action);
+      });
     };
     
     const handleCursorMove = (data: any) => {
       if (data.userId === state.localUserId) return;
       
-      setState(prev => {
-        const updatedCollaborators = prev.collaborators.map(collab => {
-          if (collab.id === data.userId) {
-            return {
-              ...collab,
-              position: { x: data.x, y: data.y }
-            };
-          }
-          return collab;
-        });
-        
-        return {
-          ...prev,
-          collaborators: updatedCollaborators
-        };
-      });
+      const action = createProjectAction(
+        ProjectActionType.UPDATE_USER_PRESENCE,
+        {
+          userId: data.userId,
+          position: { x: data.x, y: data.y }
+        },
+        { trackable: false }
+      );
+      dispatch(action);
     };
     
     const handleConnectionStatusChanged = (data: { status: 'connecting' | 'connected' | 'disconnected' }) => {
-      setState(prev => ({
-        ...prev,
-        isConnected: data.status === 'connected'
-      }));
+      const action = createProjectAction(
+        ProjectActionType.UPDATE_USER_PRESENCE,
+        {
+          userId: state.localUserId,
+          connected: data.status === 'connected'
+        },
+        { trackable: false }
+      );
+      dispatch(action);
     };
     
     webSocketService.on('connected', handleConnected);
     webSocketService.on('presenceSync', handlePresenceSync);
     webSocketService.on('cursorMove', handleCursorMove);
     webSocketService.on('connectionStatusChanged', handleConnectionStatusChanged);
-    
-    // Initialize connection status
-    setState(prev => ({
-      ...prev,
-      isConnected: webSocketService.isConnected()
-    }));
     
     return () => {
       webSocketService.off('connected', handleConnected);
@@ -371,142 +868,86 @@ export const ProjectProvider = ({ children }: ProjectProviderProps) => {
       webSocketService.off('connectionStatusChanged', handleConnectionStatusChanged);
     };
   }, [state.localUserId]);
-  
-  const connectToProject = async (projectId: string) => {
-    try {
-      // Fetch project data from the database
-      const projectData = await fetchProjectData(projectId);
-      
-      // Connect to the WebSocket channel for this project
-      webSocketService.connectToProject(projectId);
-      
-      setState(prev => ({
-        ...prev,
-        projectId,
-        history: webSocketService.getMessageHistory() as ProjectHistoryEntry[]
-      }));
-    } catch (error) {
-      console.error("Failed to connect to project:", error);
-      throw error;
+
+  // Helper function to generate user colors
+  const generateUserColor = (userId: string): string => {
+    let hash = 0;
+    for (let i = 0; i < userId.length; i++) {
+      hash = userId.charCodeAt(i) + ((hash << 5) - hash);
     }
+    const hue = Math.abs(hash) % 360;
+    return `hsl(${hue}, 70%, 65%)`;
   };
-  
-  const disconnectFromProject = () => {
-    webSocketService.disconnectFromProject();
-    setState(prev => ({
-      ...prev,
-      projectId: null,
-      isConnected: false,
-      collaborators: [],
-      history: []
-    }));
+
+  const contextValue: ProjectContextType = {
+    // State
+    state,
+    
+    // Project Management
+    loadProject,
+    setProjectLoading,
+    setProjectError,
+    updateProjectSettings,
+    
+    // Playback Actions
+    play,
+    pause,
+    restart,
+    setCurrentBeat,
+    setBpm,
+    setMasterVolume,
+    
+    // Track Actions
+    addTrack,
+    removeTrack,
+    renameTrack,
+    setTrackVolume,
+    muteTrack,
+    soloTrack,
+    armTrack,
+    lockTrack,
+    unlockTrack,
+    
+    // Block Actions
+    addBlock,
+    removeBlock,
+    updateBlock,
+    moveBlock,
+    resizeBlock,
+    duplicateBlock,
+    startEditingBlock,
+    endEditingBlock,
+    
+    // UI Actions
+    selectBlock,
+    deselectBlock,
+    setActiveTool,
+    setZoom,
+    setScrollPosition,
+    toggleSettings,
+    
+    // History Actions
+    toggleHistoryDrawer,
+    restoreToTimestamp,
+    
+    // Legacy support
+    connectToProject,
+    disconnectFromProject,
+    sendMessage,
+    messageHistory,
+    historyVisible,
+    setHistoryVisible,
+    selectedHistoryIndex,
+    setSelectedHistoryIndex,
+    updateUserName,
+    sendGeneralMessage,
   };
-  
-  const sendMessage = (action: ActionType, params: any): string => {
-    return webSocketService.sendMessage(action, params);
-  };
-  
-  const updateProjectSettings = async (settings: Partial<ProjectSettings>) => {
-    if (!state.projectId) {
-      throw new Error("No project is currently active");
-    }
-    
-    try {
-      await updateSettings(state.projectId, settings as ProjectSettings);
-      sendMessage(ActionType.UPDATE_SETTINGS, { settings });
-      
-      // Create a properly typed complete settings object
-      const updatedSettings: ProjectSettings = {
-        ...state.settings,
-        ...settings
-      };
-      
-      setState(prev => ({
-        ...prev,
-        settings: updatedSettings
-      }));
-    } catch (error) {
-      console.error("Failed to update project settings:", error);
-      throw error;
-    }
-  };
-  
-  const restoreToTimestamp = (timestamp: number) => {
-    if (!state.projectId) return;
-    
-    // Implementation to restore project state to a specific point in history
-    console.log(`Restoring project state to timestamp: ${timestamp}`);
-    
-    // In a real implementation, we would send a message to the server
-    // to restore the project state to the specified timestamp
-    sendMessage(ActionType.RESTORE_TO_TIMESTAMP, { timestamp });
-    
-    // Close the history drawer
-    setHistoryVisible(false);
-    setSelectedHistoryIndex(null);
-  };
-  
-  const updateUserName = (userName: string) => {
-    // Ensure we maintain all required settings properties
-    const updatedSettings: ProjectSettings = {
-      ...state.settings,
-      userName
-    };
-    
-    // Update user name in settings
-    setState(prev => ({
-      ...prev,
-      localUserName: userName,
-      settings: updatedSettings
-    }));
-    
-    // Update the user name in the WebSocket service
-    webSocketService.updateUserName(userName);
-    
-    // Save to project settings if connected to a project
-    if (state.projectId) {
-      updateProjectSettings({ userName });
-    }
-  };
-  
-  const sendGeneralMessage = (message: any) => {
-    webSocketService.sendGeneralMessage(message);
-  };
-  
+
   return (
-    <ProjectContext.Provider 
-      value={{
-        state,
-        sendMessage,
-        connectToProject,
-        disconnectFromProject,
-        messageHistory: webSocketService.getMessageHistory(),
-        historyVisible,
-        setHistoryVisible,
-        updateProjectSettings,
-        selectedHistoryIndex,
-        setSelectedHistoryIndex,
-        restoreToTimestamp,
-        updateUserName,
-        sendGeneralMessage
-      }}
-    >
+    <ProjectContext.Provider value={contextValue}>
       {children}
     </ProjectContext.Provider>
   );
-};
-
-// Helper function to generate a consistent color based on user ID
-const getRandomColor = (userId: string): string => {
-  // Simple hash function to convert userId to a number
-  let hash = 0;
-  for (let i = 0; i < userId.length; i++) {
-    hash = userId.charCodeAt(i) + ((hash << 5) - hash);
-  }
-  
-  // Convert the hash to a color
-  const hue = Math.abs(hash) % 360;
-  return `hsl(${hue}, 70%, 65%)`;
 };
 
 export const useProject = (): ProjectContextType => {

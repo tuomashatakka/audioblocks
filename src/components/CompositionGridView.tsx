@@ -75,6 +75,10 @@ interface CompositionGridViewProps {
   onDrop: (e: React.DragEvent<HTMLDivElement>) => void;
   isDragOver: boolean;
   placeholderBlock: {track: number, startBeat: number, lengthBeats: number} | null;
+  
+  // Context menu actions
+  onAddBlock?: (blockData: Omit<Block, 'id'>) => void;
+  onUploadAudio?: (file: File, track: number, startBeat: number) => void;
 }
 
 const CompositionGridView: React.FC<CompositionGridViewProps> = ({
@@ -116,10 +120,16 @@ const CompositionGridView: React.FC<CompositionGridViewProps> = ({
   onDragLeave,
   onDrop,
   isDragOver,
-  placeholderBlock
+  placeholderBlock,
+  onAddBlock,
+  onUploadAudio
 }) => {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const timelineRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  // Context menu state
+  const [contextMenuPosition, setContextMenuPosition] = useState<{x: number, y: number, track: number, beat: number} | null>(null);
 
   const getTrackEditingUserId = useCallback((trackIndex: number) => {
     return blocks.find(
@@ -145,37 +155,124 @@ const CompositionGridView: React.FC<CompositionGridViewProps> = ({
     );
   }, [blocks, localUserId]);
 
-  return (
-    <div className={"flex-grow overflow-hidden flex flex-col " + (isDragOver ? 'bg-primary/5' : '') }>
-      {/* Timeline */}
-      <Timeline
-        ref={timelineRef}
-        width={containerWidth}
-        pixelsPerBeat={pixelsPerBeat}
-        beatsPerBar={beatsPerBar}
-        totalBars={totalBars}
-        currentTime={currentTime}
-        totalTime={totalTime}
-        markers={markers}
-        onAddMarker={onAddMarker}
-        onEditMarker={onEditMarker}
-        onDeleteMarker={onDeleteMarker}
-        onSeek={onSeek}
-        scrollLeft={horizontalScrollPosition}
-      />
+  // Context menu handlers
+  const handleContextMenu = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    
+    if (!scrollContainerRef.current) return;
+    
+    const rect = scrollContainerRef.current.getBoundingClientRect();
+    const x = e.clientX - rect.left + scrollContainerRef.current.scrollLeft;
+    const y = e.clientY - rect.top + scrollContainerRef.current.scrollTop;
+    
+    const trackIndex = Math.floor(y / trackHeight);
+    let beatPosition = x / pixelsPerBeat;
+    
+    // Apply snapping if enabled
+    if (snapToGrid && gridSize > 0) {
+      beatPosition = Math.round(beatPosition / gridSize) * gridSize;
+    }
+    
+    setContextMenuPosition({
+      x: e.clientX,
+      y: e.clientY,
+      track: Math.max(0, Math.min(trackIndex, tracks.length - 1)),
+      beat: Math.max(0, beatPosition)
+    });
+  }, [trackHeight, pixelsPerBeat, snapToGrid, gridSize, tracks.length]);
 
-      {/* Composition Grid */}
-      <div
-        ref={scrollContainerRef}
-        className={`${ui.layout.growContainer} project-area ${isDragOver ? 'bg-primary/5' : ''}`}
-        onClick={onContainerClick}
-        onDoubleClick={onContainerDoubleClick}
-        onScroll={onScroll}
-        onDragEnter={onDragEnter}
-        onDragOver={onDragOver}
-        onDragLeave={onDragLeave}
-        onDrop={onDrop}
-      >
+  const handleFileUpload = useCallback((files: FileList | null) => {
+    if (!files || !contextMenuPosition || !onUploadAudio) return;
+    
+    const audioFiles = Array.from(files).filter(file => {
+      const audioExtensions = ['.mp3', '.wav', '.ogg', '.m4a', '.aac', '.flac', '.wma'];
+      const fileName = file.name?.toLowerCase();
+      return file.type.startsWith('audio/') || (fileName ? audioExtensions.some(ext => fileName.endsWith(ext)) : false);
+    });
+    
+    if (audioFiles.length === 0) {
+      toast({
+        title: "No audio files",
+        description: "Please select audio files (.mp3, .wav, .ogg, .m4a, .aac, .flac, .wma)",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    // Upload each audio file
+    audioFiles.forEach((file, index) => {
+      const startBeat = contextMenuPosition.beat + (index * beatsPerBar); // Offset each file by 1 bar
+      onUploadAudio(file, contextMenuPosition.track, startBeat);
+    });
+    
+    setContextMenuPosition(null);
+  }, [contextMenuPosition, onUploadAudio, beatsPerBar]);
+
+  const handleUploadClick = useCallback(() => {
+    fileInputRef.current?.click();
+  }, []);
+
+  const handleAddEmptyBlock = useCallback(() => {
+    if (!contextMenuPosition || !onAddBlock) return;
+    
+    const blockData = {
+      name: `Block ${Date.now()}`,
+      track: contextMenuPosition.track,
+      startBeat: contextMenuPosition.beat,
+      lengthBeats: beatsPerBar,
+      volume: 80,
+      pitch: 0
+    };
+    
+    onAddBlock(blockData);
+    setContextMenuPosition(null);
+  }, [contextMenuPosition, onAddBlock, beatsPerBar]);
+
+  return (
+    <>
+      {/* Hidden file input for audio uploads */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="audio/*"
+        multiple
+        style={{ display: 'none' }}
+        onChange={(e) => handleFileUpload(e.target.files)}
+      />
+      
+      <div className="flex-grow overflow-hidden flex flex-col">
+        {/* Timeline */}
+        <Timeline
+          ref={timelineRef}
+          width={containerWidth}
+          pixelsPerBeat={pixelsPerBeat}
+          beatsPerBar={beatsPerBar}
+          totalBars={totalBars}
+          currentTime={currentTime}
+          totalTime={totalTime}
+          markers={markers}
+          onAddMarker={onAddMarker}
+          onEditMarker={onEditMarker}
+          onDeleteMarker={onDeleteMarker}
+          onSeek={onSeek}
+          scrollLeft={horizontalScrollPosition}
+        />
+
+        {/* Composition Grid with Context Menu */}
+        <ContextMenu>
+          <ContextMenuTrigger asChild>
+            <div
+              ref={scrollContainerRef}
+              className={`${ui.layout.growContainer} project-area ${isDragOver ? 'bg-primary/5' : ''}`}
+              onClick={onContainerClick}
+              onDoubleClick={onContainerDoubleClick}
+              onScroll={onScroll}
+              onDragEnter={onDragEnter}
+              onDragOver={onDragOver}
+              onDragLeave={onDragLeave}
+              onDrop={onDrop}
+              onContextMenu={handleContextMenu}
+            >
         <div
           className="absolute inset-0"
           style={{
@@ -292,8 +389,27 @@ const CompositionGridView: React.FC<CompositionGridViewProps> = ({
             }}
           />
         </div>
+            </div>
+          </ContextMenuTrigger>
+          
+          <ContextMenuContent className="w-48">
+            <ContextMenuItem onClick={handleUploadClick}>
+              <Upload className="mr-2 h-4 w-4" />
+              Upload Audio
+            </ContextMenuItem>
+            <ContextMenuSeparator />
+            <ContextMenuItem onClick={handleAddEmptyBlock}>
+              <Plus className="mr-2 h-4 w-4" />
+              Add Empty Block
+            </ContextMenuItem>
+            <ContextMenuItem disabled>
+              <Music className="mr-2 h-4 w-4" />
+              Add MIDI Block
+            </ContextMenuItem>
+          </ContextMenuContent>
+        </ContextMenu>
       </div>
-    </div>
+    </>
   );
 };
 

@@ -655,6 +655,26 @@ const ProjectView: React.FC = () => {
     removeMarker(id);
   };
 
+  // Context menu handlers for CompositionGridView
+  const handleAddBlockFromContext = (blockData: Omit<Block, 'id'>) => {
+    addBlock(blockData);
+  };
+
+  const handleUploadAudioFromContext = (file: File, track: number, startBeat: number) => {
+    const fileName = file.name.replace(/\.[^/.]+$/, ""); // Remove extension
+    const blockData = {
+      name: fileName,
+      track,
+      startBeat,
+      lengthBeats: beatsPerBar, // Use 1 bar as default
+      volume: 80,
+      pitch: 0,
+      file // Include the file for upload
+    };
+
+    addBlock(blockData);
+  };
+
   const handleSettingsChange = (key: string, value: any) => {
     updateProjectSettings({
       [key]: value
@@ -955,6 +975,8 @@ const ProjectView: React.FC = () => {
           onDrop={handleDrop}
           isDragOver={isDragOver}
           placeholderBlock={placeholderBlock}
+          onAddBlock={handleAddBlockFromContext}
+          onUploadAudio={handleUploadAudioFromContext}
         />
       </div>
 

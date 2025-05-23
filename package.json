@@ -46,6 +46,7 @@
     "clsx": "^2.1.1",
     "cmdk": "^1.0.0",
     "date-fns": "^3.6.0",
+    "disposable-events": "^1.0.0",
     "embla-carousel-react": "^8.3.0",
     "event-kit": "^2.5.3",
     "input-otp": "^1.2.4",

@@ -1,42 +1,55 @@
+/* eslint-disable react-hooks/exhaustive-deps */
 import React, { createContext, useContext, useReducer, useEffect, ReactNode, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import WebSocketService from '@/utils/WebSocketService';
-import { ActionType, UserInteractionMessage } from '@/types/collaborative';
-import { 
-  ProjectState, 
-  ProjectHistoryEntry, 
-  Track, 
-  Block, 
+import { getAudioSequenceService } from '@/utils/AudioSequenceService';
+import { ActionType, GeneralMessage, UserInteractionMessage } from '@/types/collaborative';
+import {
+  ProjectState,
+  ProjectHistoryEntry,
+  Track,
+  Block,
   ProjectSettings,
+  TimelineMarker,
   initialProjectState,
-  projectReducer
+  projectReducer,
+  generateUserColor
 } from './projectReducer';
 import {
   ProjectActionType,
   playbackActions,
   trackActions,
   blockActions,
-  uiActions,
   createProjectAction,
   LoadProjectAction,
   SetProjectLoadingAction,
   SetProjectErrorAction,
   UpdateProjectSettingsAction,
+  RestoreToTimestampAction,
+  SelectBlockAction,
+  DeselectBlockAction,
+  SetActiveToolAction,
+  SetZoomAction,
+  SetScrollPositionAction,
+  ToggleSettingsAction,
   ToggleHistoryDrawerAction,
-  RestoreToTimestampAction
+  markerActions
 } from './projectActions';
 import { ToolType } from '@/components/ToolsMenu';
+import { toast } from "@/hooks/use-toast";
+import { RealtimePresenceState } from '@supabase/supabase-js';
+
 
 interface ProjectContextType {
   // State
   state: ProjectState;
-  
+
   // Project Management
-  loadProject: (projectData: any) => void;
+  loadProject: (projectData: object) => void;
   setProjectLoading: (loading: boolean) => void;
   setProjectError: (error: string | null) => void;
   updateProjectSettings: (settings: Partial<ProjectSettings>) => Promise<void>;
-  
+
   // Playback Actions
   play: () => void;
   pause: () => void;
@@ -44,7 +57,7 @@ interface ProjectContextType {
   setCurrentBeat: (beat: number) => void;
   setBpm: (bpm: number) => void;
   setMasterVolume: (volume: number) => void;
-  
+
   // Track Actions
   addTrack: (track: Omit<Track, 'id'>) => Promise<void>;
   removeTrack: (trackId: string) => void;
@@ -55,7 +68,7 @@ interface ProjectContextType {
   armTrack: (trackId: string, armed: boolean) => void;
   lockTrack: (trackId: string) => void;
   unlockTrack: (trackId: string) => void;
-  
+
   // Block Actions
   addBlock: (block: Omit<Block, 'id'>) => void;
   removeBlock: (blockId: string) => void;
@@ -65,7 +78,16 @@ interface ProjectContextType {
   duplicateBlock: (blockId: string) => void;
   startEditingBlock: (blockId: string) => void;
   endEditingBlock: (blockId: string) => void;
-  
+
+  // Audio File Actions
+  uploadAudioFile: (file: File) => Promise<string | null>;
+  deleteAudioFile: (blockId: string, fileId: string) => Promise<void>;
+
+  // Marker Actions
+  addMarker: (marker: Omit<TimelineMarker, 'id' | 'projectId' | 'createdBy' | 'createdAt'>) => void;
+  updateMarker: (markerId: string, changes: Partial<TimelineMarker>) => void;
+  removeMarker: (markerId: string) => void;
+
   // UI Actions
   selectBlock: (blockId: string) => void;
   deselectBlock: () => void;
@@ -73,22 +95,22 @@ interface ProjectContextType {
   setZoom: (pixelsPerBeat: number) => void;
   setScrollPosition: (horizontal: number, vertical: number) => void;
   toggleSettings: (open: boolean) => void;
-  
+
   // History Actions
   toggleHistoryDrawer: (open: boolean) => void;
   restoreToTimestamp: (timestamp: number) => void;
-  
+
   // Legacy support for existing code
   connectToProject: (projectId: string) => Promise<void>;
   disconnectFromProject: () => void;
-  sendMessage: (action: ActionType, params: any) => string;
+  sendMessage: (action: ActionType, params: object) => string;
   messageHistory: UserInteractionMessage[];
   historyVisible: boolean;
   setHistoryVisible: (visible: boolean) => void;
   selectedHistoryIndex: number | null;
   setSelectedHistoryIndex: (index: number | null) => void;
   updateUserName: (name: string) => void;
-  sendGeneralMessage: (message: any) => void;
+  sendGeneralMessage: (message: unknown) => void;
 }
 
 const ProjectContext = createContext<ProjectContextType | undefined>(undefined);
@@ -107,9 +129,9 @@ const fetchProjectData = async (projectId: string) => {
       .select('*')
       .eq('id', projectId)
       .single();
-      
+
     if (projectError) throw projectError;
-    
+
     // Parse settings JSON from the database
     let projectSettings: ProjectSettings = {
       theme: 'dark',
@@ -118,14 +140,14 @@ const fetchProjectData = async (projectId: string) => {
       autoSave: true,
       showCollaborators: true
     };
-    
+
     if (projectData.settings) {
       try {
         // If settings is a string, parse it, otherwise use as is
-        const parsedSettings = typeof projectData.settings === 'string' 
-          ? JSON.parse(projectData.settings) 
+        const parsedSettings = typeof projectData.settings === 'string'
+          ? JSON.parse(projectData.settings)
           : projectData.settings;
-          
+
         projectSettings = {
           ...projectSettings, // Keep defaults
           ...parsedSettings   // Override with stored settings
@@ -134,23 +156,31 @@ const fetchProjectData = async (projectId: string) => {
         console.error("Failed to parse project settings:", e);
       }
     }
-    
+
     // Fetch tracks
     const { data: tracksData, error: tracksError } = await supabase
       .from('tracks')
       .select('*')
       .eq('project_id', projectId);
-      
+
     if (tracksError) throw tracksError;
-    
+
     // Fetch audio blocks
     const { data: blocksData, error: blocksError } = await supabase
       .from('audio_blocks')
       .select('*')
       .in('track_id', tracksData.map(track => track.id));
-      
+
     if (blocksError) throw blocksError;
-    
+
+    // Fetch timeline markers
+    const { data: markersData, error: markersError } = await supabase
+      .from('timeline_markers')
+      .select('*')
+      .eq('project_id', projectId);
+
+    if (markersError) throw markersError;
+
     // Transform the data to match the application structure
     const formattedTracks = tracksData.map(track => ({
       id: track.id,
@@ -164,7 +194,7 @@ const fetchProjectData = async (projectId: string) => {
       lockedByUser: track.locked_by_user_id || null,
       lockedByUserName: track.locked_by_name || null
     }));
-    
+
     const formattedBlocks = blocksData.map(block => ({
       id: block.id,
       track: formattedTracks.findIndex(track => track.id === block.track_id),
@@ -175,7 +205,18 @@ const fetchProjectData = async (projectId: string) => {
       pitch: block.pitch,
       fileId: block.file_id
     }));
-    
+
+    const formattedMarkers = (markersData || []).map(marker => ({
+      id: marker.id,
+      position: marker.position,
+      color: marker.color,
+      icon: marker.icon,
+      label: marker.label,
+      projectId: marker.project_id,
+      createdBy: marker.created_by,
+      createdAt: new Date(marker.created_at).getTime()
+    }));
+
     return {
       project: {
         id: projectData.id,
@@ -184,8 +225,9 @@ const fetchProjectData = async (projectId: string) => {
         masterVolume: projectData.master_volume || 80,
         settings: projectSettings
       },
-      tracks: formattedTracks,
-      blocks: formattedBlocks
+      tracks: formattedTracks || [],
+      blocks: formattedBlocks || [],
+      markers: formattedMarkers || []
     };
   } catch (error) {
     console.error("Error fetching project data:", error);
@@ -203,18 +245,18 @@ const updateProject = async (
   }
 ) => {
   try {
-    const updateData: any = {};
-    
+    const updateData: Record<string, unknown> = {};
+
     if (data.name !== undefined) updateData.name = data.name;
     if (data.bpm !== undefined) updateData.bpm = data.bpm;
     if (data.masterVolume !== undefined) updateData.master_volume = data.masterVolume;
     if (data.settings !== undefined) updateData.settings = data.settings;
-    
+
     const { data: result, error } = await supabase
       .from('projects')
       .update(updateData)
       .eq('id', projectId);
-      
+
     if (error) throw error;
     return result;
   } catch (error) {
@@ -224,7 +266,7 @@ const updateProject = async (
 };
 
 const createBlock = async (
-  projectId: string, 
+  projectId: string,
   trackId: string,
   data: {
     name: string;
@@ -247,7 +289,7 @@ const createBlock = async (
         pitch: data.pitch || 0.0,
         file_id: data.fileId
       });
-      
+
     if (error) throw error;
     return result;
   } catch (error) {
@@ -263,9 +305,9 @@ const updateSettings = async (projectId: string, settings: ProjectSettings) => {
       .select('*')
       .eq('id', projectId)
       .single();
-      
+
     if (fetchError) throw fetchError;
-    
+
     // Parse existing settings or use default
     let currentSettings: ProjectSettings = {
       theme: 'dark',
@@ -274,14 +316,14 @@ const updateSettings = async (projectId: string, settings: ProjectSettings) => {
       autoSave: true,
       showCollaborators: true
     };
-    
+
     if (project.settings) {
       try {
         // If settings is a string, parse it, otherwise use as is
-        const parsedSettings = typeof project.settings === 'string' 
-          ? JSON.parse(project.settings) 
+        const parsedSettings = typeof project.settings === 'string'
+          ? JSON.parse(project.settings)
           : project.settings;
-          
+
         currentSettings = {
           ...currentSettings,
           ...parsedSettings
@@ -290,23 +332,23 @@ const updateSettings = async (projectId: string, settings: ProjectSettings) => {
         console.error("Failed to parse project settings:", e);
       }
     }
-    
+
     // Merge with new settings
     const updatedSettings: ProjectSettings = {
       ...currentSettings,
       ...settings
     };
-    
+
     // Update the project with the new settings
     const { data: result, error: updateError } = await supabase
       .from('projects')
-      .update({ 
+      .update({
         settings: updatedSettings,
         bpm: project.bpm || 120,
         master_volume: project.master_volume || 80
       })
       .eq('id', projectId);
-      
+
     if (updateError) throw updateError;
     return result;
   } catch (error) {
@@ -329,18 +371,59 @@ export const ProjectProvider = ({ children }: ProjectProviderProps) => {
     userName: state.localUserName,
   }), [state.localUserId, state.localUserName]);
 
+  const uploadAudioFile = useCallback(async (file: File) => {
+    if (!state.project.id) return null;
+
+    try {
+      const filePath = `audio/${state.project.id}/${file.name}`;
+      const { data, error } = await supabase.storage
+        .from('project-audio')
+        .upload(filePath, file, {
+          cacheControl: '3600',
+          upsert: false
+        });
+
+      if (error) {
+        console.error('Error uploading audio file:', error);
+        return null;
+      }
+
+      return data.path; // Return the file path in storage
+    } catch (error) {
+      console.error("Unexpected error uploading audio:", error);
+      return null;
+    }
+  }, [state.project.id]);
+
+  const deleteAudioFile = useCallback(async (blockId: string, fileId: string) => {
+    if (!state.project.id) return;
+
+    try {
+      const filePath = `audio/${state.project.id}/${blockId}/${fileId}`;
+      const { error } = await supabase.storage
+        .from('project-audio')
+        .remove([filePath]);
+
+      if (error) {
+        console.error('Error deleting audio file:', error);
+      }
+    } catch (error) {
+      console.error("Unexpected error deleting audio:", error);
+    }
+  }, [state.project.id]);
+
   // Project Management Actions
-  const loadProject = useCallback((projectData: any) => {
+  const loadProject = useCallback((projectData: Record<string, string>) => {
     const action = createProjectAction<LoadProjectAction>(
       ProjectActionType.LOAD_PROJECT,
       {
         id: projectData.id,
         name: projectData.name,
-        bpm: projectData.bpm,
-        masterVolume: projectData.masterVolume,
-        settings: projectData.settings,
-        tracks: projectData.tracks,
-        blocks: projectData.blocks
+        bpm: projectData.bpm as unknown as number,
+        masterVolume: projectData.masterVolume as unknown as number,
+        settings: projectData.settings as unknown as ProjectSettings,
+        tracks: projectData.tracks as unknown as Track[],
+        blocks: projectData.block as unknown as Block[]
       },
       { trackable: false }
     );
@@ -365,7 +448,7 @@ export const ProjectProvider = ({ children }: ProjectProviderProps) => {
     dispatch(action);
   }, []);
 
-  const updateProjectSettings = useCallback(async (settings: Partial<ProjectSettings>) => {
+  const updateProjectSettings = useCallback(async (settings: ProjectSettings) => {
     if (!state.project.id) {
       throw new Error("No project is currently active");
     }
@@ -374,13 +457,13 @@ export const ProjectProvider = ({ children }: ProjectProviderProps) => {
       const action = createProjectAction<UpdateProjectSettingsAction>(
         ProjectActionType.UPDATE_PROJECT_SETTINGS,
         { settings },
-        { 
+        {
           ...getCurrentUser(),
           description: `Updated project settings`,
         }
       );
       dispatch(action);
-      
+
       sendMessage(ActionType.UPDATE_SETTINGS, { settings });
     } catch (error) {
       console.error("Failed to update project settings:", error);
@@ -388,13 +471,29 @@ export const ProjectProvider = ({ children }: ProjectProviderProps) => {
     }
   }, [state.project.id, getCurrentUser]);
 
+  // Update audio sequence when blocks or BPM changes
+  const updateAudioSequence = useCallback(async () => {
+    if (!state.project.id) return;
+    
+    const audioSequenceService = getAudioSequenceService();
+    await audioSequenceService.updateAudioSequence(
+      state.blocks, 
+      state.project.bpm, 
+      state.project.id
+    );
+  }, [state.project.id, state.blocks, state.project.bpm]);
+
   // Playback Actions
-  const play = useCallback(() => {
+  const play = useCallback(async () => {
     const { userId, userName } = getCurrentUser();
+    
+    // Update audio sequence before playing
+    await updateAudioSequence();
+    
     const action = playbackActions.play(userId, userName);
     dispatch(action);
     sendMessage(ActionType.PLAY, {});
-  }, [getCurrentUser]);
+  }, [getCurrentUser, updateAudioSequence]);
 
   const pause = useCallback(() => {
     const { userId, userName } = getCurrentUser();
@@ -403,8 +502,11 @@ export const ProjectProvider = ({ children }: ProjectProviderProps) => {
     sendMessage(ActionType.PAUSE, {});
   }, [getCurrentUser]);
 
-  const restart = useCallback(() => {
+  const restart = useCallback(async () => {
     const { userId, userName } = getCurrentUser();
+    
+    // Update audio sequence before restarting
+    await updateAudioSequence();
     const action = playbackActions.restart(userId, userName);
     dispatch(action);
     sendMessage(ActionType.RESTART, {});
@@ -419,12 +521,15 @@ export const ProjectProvider = ({ children }: ProjectProviderProps) => {
     dispatch(action);
   }, []);
 
-  const setBpm = useCallback((bpm: number) => {
+  const setBpm = useCallback(async (bpm: number) => {
     const { userId, userName } = getCurrentUser();
     const action = playbackActions.setBpm(bpm, userId, userName);
     dispatch(action);
     sendMessage(ActionType.UPDATE_SETTINGS, { bpm });
-  }, [getCurrentUser]);
+    
+    // Update audio sequence with new BPM
+    setTimeout(() => updateAudioSequence(), 100); // Slight delay to ensure state update
+  }, [getCurrentUser, updateAudioSequence]);
 
   const setMasterVolume = useCallback((volume: number) => {
     const { userId, userName } = getCurrentUser();
@@ -438,7 +543,7 @@ export const ProjectProvider = ({ children }: ProjectProviderProps) => {
     if (!state.project.id) return;
 
     const { userId, userName } = getCurrentUser();
-    
+
     try {
       const { data: newTrackData, error } = await supabase
         .from('tracks')
@@ -453,14 +558,14 @@ export const ProjectProvider = ({ children }: ProjectProviderProps) => {
         })
         .select()
         .single();
-        
+
       if (error) throw error;
-      
-      const newTrack: Track = { 
-        id: newTrackData.id, 
+
+      const newTrack: Track = {
+        id: newTrackData.id,
         ...trackData
       };
-      
+
       const action = trackActions.addTrack(newTrack, userId, userName);
       dispatch(action);
       sendMessage(ActionType.ADD_TRACK, { track: newTrack });
@@ -474,7 +579,7 @@ export const ProjectProvider = ({ children }: ProjectProviderProps) => {
     const { userId, userName } = getCurrentUser();
     const track = state.tracks.find(t => t.id === trackId);
     const trackName = track?.name || 'Unknown';
-    
+
     const action = trackActions.removeTrack(trackId, trackName, userId, userName);
     dispatch(action);
     sendMessage(ActionType.REMOVE_TRACK, { trackId });
@@ -484,7 +589,7 @@ export const ProjectProvider = ({ children }: ProjectProviderProps) => {
     const { userId, userName } = getCurrentUser();
     const track = state.tracks.find(t => t.id === trackId);
     const oldName = track?.name || 'Unknown';
-    
+
     const action = trackActions.renameTrack(trackId, name, oldName, userId, userName);
     dispatch(action);
     sendMessage(ActionType.RENAME_TRACK, { trackId, name });
@@ -494,7 +599,7 @@ export const ProjectProvider = ({ children }: ProjectProviderProps) => {
     const { userId, userName } = getCurrentUser();
     const track = state.tracks.find(t => t.id === trackId);
     const trackName = track?.name || 'Unknown';
-    
+
     const action = trackActions.setTrackVolume(trackId, volume, trackName, userId, userName);
     dispatch(action);
     sendMessage(ActionType.SET_TRACK_VOLUME, { trackId, volume });
@@ -504,7 +609,7 @@ export const ProjectProvider = ({ children }: ProjectProviderProps) => {
     const { userId, userName } = getCurrentUser();
     const track = state.tracks.find(t => t.id === trackId);
     const trackName = track?.name || 'Unknown';
-    
+
     const action = trackActions.muteTrack(trackId, muted, trackName, userId, userName);
     dispatch(action);
     sendMessage(ActionType.MUTE_TRACK, { trackId, muted });
@@ -514,7 +619,7 @@ export const ProjectProvider = ({ children }: ProjectProviderProps) => {
     const { userId, userName } = getCurrentUser();
     const track = state.tracks.find(t => t.id === trackId);
     const trackName = track?.name || 'Unknown';
-    
+
     const action = trackActions.soloTrack(trackId, solo, trackName, userId, userName);
     dispatch(action);
     sendMessage(ActionType.SOLO_TRACK, { trackId, solo });
@@ -524,7 +629,7 @@ export const ProjectProvider = ({ children }: ProjectProviderProps) => {
     const { userId, userName } = getCurrentUser();
     const track = state.tracks.find(t => t.id === trackId);
     const trackName = track?.name || 'Unknown';
-    
+
     const action = trackActions.armTrack(trackId, armed, trackName, userId, userName);
     dispatch(action);
     sendMessage(ActionType.ARM_TRACK, { trackId, armed });
@@ -534,7 +639,7 @@ export const ProjectProvider = ({ children }: ProjectProviderProps) => {
     const { userId, userName } = getCurrentUser();
     const track = state.tracks.find(t => t.id === trackId);
     const trackName = track?.name || 'Unknown';
-    
+
     const action = trackActions.lockTrack(trackId, trackName, userId, userName);
     dispatch(action);
     sendMessage(ActionType.LOCK_TRACK, { trackId, userId });
@@ -545,7 +650,7 @@ export const ProjectProvider = ({ children }: ProjectProviderProps) => {
     const { userId, userName } = getCurrentUser();
     const track = state.tracks.find(t => t.id === trackId);
     const trackName = track?.name || 'Unknown';
-    
+
     const action = trackActions.unlockTrack(trackId, trackName, userId, userName);
     dispatch(action);
     sendMessage(ActionType.UNLOCK_TRACK, { trackId });
@@ -553,32 +658,100 @@ export const ProjectProvider = ({ children }: ProjectProviderProps) => {
   }, [state.tracks, getCurrentUser]);
 
   // Block Actions
-  const addBlock = useCallback((blockData: Omit<Block, 'id'>) => {
-    const { userId, userName } = getCurrentUser();
-    const blockId = `block-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-    const block: Block = { id: blockId, ...blockData };
-    const trackName = state.tracks[blockData.track]?.name || 'Unknown';
-    
-    const action = blockActions.addBlock(block, trackName, userId, userName);
-    dispatch(action);
-    sendMessage(ActionType.ADD_BLOCK, { block });
-  }, [state.tracks, getCurrentUser]);
+  const addBlock = useCallback(async (blockData: Omit<Block, 'id'> & { file?: File }) => {
+    if (!state.project.id) return;
 
-  const removeBlock = useCallback((blockId: string) => {
+    const { userId, userName } = getCurrentUser();
+    const track = state.tracks[blockData.track];
+    const trackName = track?.name || 'Unknown';
+
+    let fileId: string | undefined;
+    if (blockData.file) {
+      // Upload the audio file and get the file ID
+      const uploadedFilePath = await uploadAudioFile('temp-block-id', blockData.file);
+      if (uploadedFilePath) {
+        fileId = uploadedFilePath;
+      } else {
+        console.error("Failed to upload audio file for block:", blockData.name);
+      }
+    }
+
+    const newBlockId = `block-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    
+    // Create the block object
+    const newBlock: Block = {
+      id: newBlockId,
+      name: blockData.name,
+      track: blockData.track,
+      startBeat: blockData.startBeat,
+      lengthBeats: blockData.lengthBeats,
+      volume: blockData.volume || 80,
+      pitch: blockData.pitch || 0,
+      fileId: fileId,
+    };
+
+    try {
+      // Insert into database
+      const { error: insertError } = await supabase
+        .from('audio_blocks')
+        .insert({
+          id: newBlock.id,
+          track_id: track.id,
+          name: newBlock.name,
+          start_beat: newBlock.startBeat,
+          length_beats: newBlock.lengthBeats,
+          volume: newBlock.volume,
+          pitch: newBlock.pitch,
+          file_id: newBlock.fileId
+        });
+
+      if (insertError) throw insertError;
+
+      // Update local state
+      const action = blockActions.addBlock(newBlock, trackName, userId, userName);
+      dispatch(action);
+      sendMessage(ActionType.ADD_BLOCK, { block: newBlock });
+
+      toast({
+        title: "Block Added",
+        description: `Added "${newBlock.name}" to ${trackName}`,
+      });
+
+      // Update audio sequence after adding block
+      setTimeout(() => updateAudioSequence(), 100);
+    } catch (error) {
+      console.error('Error adding block to database:', error);
+      toast({
+        title: "Error",
+        description: "Failed to save block to database",
+        variant: "destructive",
+      });
+    }
+  }, [state.project.id, state.tracks, getCurrentUser, uploadAudioFile]);
+
+  const removeBlock = useCallback(async (blockId: string) => {
     const { userId, userName } = getCurrentUser();
     const block = state.blocks.find(b => b.id === blockId);
     const blockName = block?.name || 'Unknown';
-    
+
+    if (block?.fileId) {
+      // Delete the audio file from storage
+      await deleteAudioFile(blockId, block.fileId);
+    }
+
     const action = blockActions.removeBlock(blockId, blockName, userId, userName);
     dispatch(action);
     sendMessage(ActionType.REMOVE_BLOCK, { blockId });
-  }, [state.blocks, getCurrentUser]);
+
+    // Update audio sequence after removing block
+    setTimeout(() => updateAudioSequence(), 100);
+  }, [state.blocks, getCurrentUser, deleteAudioFile]);
 
   const updateBlock = useCallback((blockId: string, updates: Partial<Block>) => {
     const { userId, userName } = getCurrentUser();
     const block = state.blocks.find(b => b.id === blockId);
     const blockName = block?.name || 'Unknown';
-    
+
     const action = blockActions.updateBlock(blockId, updates, blockName, userId, userName);
     dispatch(action);
     sendMessage(ActionType.UPDATE_BLOCK, { blockId, ...updates });
@@ -588,7 +761,7 @@ export const ProjectProvider = ({ children }: ProjectProviderProps) => {
     const { userId, userName } = getCurrentUser();
     const block = state.blocks.find(b => b.id === blockId);
     const blockName = block?.name || 'Unknown';
-    
+
     const action = blockActions.moveBlock(blockId, track, startBeat, blockName, userId, userName);
     dispatch(action);
     sendMessage(ActionType.MOVE_BLOCK, { blockId, trackId: track, startBeat });
@@ -598,7 +771,7 @@ export const ProjectProvider = ({ children }: ProjectProviderProps) => {
     const { userId, userName } = getCurrentUser();
     const block = state.blocks.find(b => b.id === blockId);
     const blockName = block?.name || 'Unknown';
-    
+
     const action = blockActions.resizeBlock(blockId, lengthBeats, blockName, userId, userName);
     dispatch(action);
     sendMessage(ActionType.RESIZE_BLOCK, { blockId, lengthBeats });
@@ -608,7 +781,7 @@ export const ProjectProvider = ({ children }: ProjectProviderProps) => {
     const { userId, userName } = getCurrentUser();
     const block = state.blocks.find(b => b.id === blockId);
     if (!block) return;
-    
+
     const newBlockId = `block-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     const newBlock = {
       ...block,
@@ -616,288 +789,289 @@ export const ProjectProvider = ({ children }: ProjectProviderProps) => {
       startBeat: block.startBeat + block.lengthBeats,
       name: `${block.name} (copy)`
     };
-    
+
+    const trackName = state.tracks[block.track]?.name || 'Unknown';
     const action = blockActions.duplicateBlock(blockId, newBlock, userId, userName);
     dispatch(action);
-    sendMessage(ActionType.DUPLICATE_BLOCK, { 
+    sendMessage(ActionType.DUPLICATE_BLOCK, {
       originalBlockId: blockId,
-      newBlockId: newBlockId,
-      newStartBeat: newBlock.startBeat
+      newBlock
     });
-  }, [state.blocks, getCurrentUser]);
+  }, [state.blocks, state.tracks, getCurrentUser]);
 
   const startEditingBlock = useCallback((blockId: string) => {
     const { userId, userName } = getCurrentUser();
     const block = state.blocks.find(b => b.id === blockId);
     const blockName = block?.name || 'Unknown';
-    
+
     const action = blockActions.startEditingBlock(blockId, blockName, userId, userName);
     dispatch(action);
-    sendMessage(ActionType.START_EDITING_BLOCK, { blockId });
+    sendMessage(ActionType.START_EDITING_BLOCK, { blockId, userId });
   }, [state.blocks, getCurrentUser]);
 
   const endEditingBlock = useCallback((blockId: string) => {
     const { userId, userName } = getCurrentUser();
     const block = state.blocks.find(b => b.id === blockId);
     const blockName = block?.name || 'Unknown';
-    
+
     const action = blockActions.endEditingBlock(blockId, blockName, userId, userName);
     dispatch(action);
     sendMessage(ActionType.END_EDITING_BLOCK, { blockId });
   }, [state.blocks, getCurrentUser]);
 
+  // Marker Actions
+  const addMarker = useCallback(async (markerData: Omit<TimelineMarker, 'id' | 'projectId' | 'createdBy' | 'createdAt'>) => {
+    if (!state.project.id) return;
+
+    const { userId, userName } = getCurrentUser();
+    const markerId = `marker-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
+    const marker: TimelineMarker = {
+      id: markerId,
+      projectId: state.project.id,
+      createdBy: userId,
+      createdAt: Date.now(),
+      ...markerData
+    };
+
+    try {
+      // Save to database
+      const { error, data } = await supabase
+        .from('timeline_markers')
+        .insert({
+          project_id: marker.projectId,
+          position: marker.position,
+          color: marker.color,
+          icon: marker.icon,
+          label: marker.label,
+          created_by: marker.createdBy,
+          created_at: new Date(marker.createdAt).toISOString()
+        })
+        .select()
+        .single()
+
+      if (error) throw error;
+
+      console.log('Marker saved to database:', data);
+      marker.id = data.id
+
+      // Update local state
+      const action = markerActions.addMarker(marker, userId, userName);
+      dispatch(action);
+      sendMessage(ActionType.ADD_MARKER, { marker });
+
+      toast({
+        title: "Marker Added",
+        description: `Added marker "${marker.label || 'Marker'}" at beat ${marker.position + 1}`,
+        color: "success",
+      });
+    }
+    catch (error) {
+      console.error('Error adding marker:', error);
+      toast({
+        title: "Error",
+        description: "Failed to add marker",
+        variant: "destructive",
+      });
+    }
+  }, [ state.project.id, getCurrentUser ]);
+
+  const updateMarker = useCallback(async (markerId: string, changes: Partial<TimelineMarker>) => {
+    if (!state.project.id) return;
+
+    const { userId, userName } = getCurrentUser();
+    const marker = state.markers.find(m => m.id === markerId);
+    if (!marker) return;
+
+    try {
+      // Update in database
+      const updateData: Partial<TimelineMarker> = {};
+      if (changes.position !== undefined) updateData.position = changes.position;
+      if (changes.color !== undefined) updateData.color = changes.color;
+      if (changes.icon !== undefined) updateData.icon = changes.icon;
+      if (changes.label !== undefined) updateData.label = changes.label;
+
+      const { error } = await supabase
+        .from('timeline_markers')
+        .update(updateData)
+        .eq('id', markerId);
+
+      if (error) throw error;
+
+      // Update local state
+      const action = markerActions.updateMarker(markerId, changes, marker.label || 'Marker', userId, userName);
+      dispatch(action);
+      sendMessage(ActionType.UPDATE_MARKER, { markerId, changes });
+
+      toast({
+        title: "Marker Updated",
+        description: `Updated marker "${marker.label || 'Marker'}"`,
+      });
+    } catch (error) {
+      console.error('Error updating marker:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update marker",
+        variant: "destructive",
+      });
+    }
+  }, [state.project.id, state.markers, getCurrentUser ]);
+
+  const removeMarker = useCallback(async (markerId: string) => {
+    if (!state.project.id) return;
+
+    const { userId, userName } = getCurrentUser();
+    const marker = state.markers.find(m => m.id === markerId);
+    if (!marker) return;
+
+    try {
+      // Remove from database
+      const { error } = await supabase
+        .from('timeline_markers')
+        .delete()
+        .eq('id', markerId);
+
+      if (error) throw error;
+
+      // Update local state
+      const action = markerActions.removeMarker(markerId, marker.label || 'Marker', userId, userName);
+      dispatch(action);
+      sendMessage(ActionType.REMOVE_MARKER, { markerId });
+
+      toast({
+        title: "Marker Removed",
+        description: `Removed marker "${marker.label || 'Marker'}"`,
+      });
+    } catch (error) {
+      console.error('Error removing marker:', error);
+      toast({
+        title: "Error",
+        description: "Failed to remove marker",
+        variant: "destructive",
+      });
+    }
+  }, [state.project.id, state.markers, getCurrentUser ]);
+
   // UI Actions
   const selectBlock = useCallback((blockId: string) => {
-    const action = uiActions.selectBlock(blockId);
-    dispatch(action);
+    dispatch(createProjectAction<SelectBlockAction>(ProjectActionType.SELECT_BLOCK, { blockId }, { trackable: false }));
   }, []);
 
   const deselectBlock = useCallback(() => {
-    const action = uiActions.deselectBlock();
-    dispatch(action);
+    dispatch(createProjectAction<DeselectBlockAction>(ProjectActionType.DESELECT_BLOCK, undefined, { trackable: false }));
   }, []);
 
   const setActiveTool = useCallback((tool: ToolType) => {
-    const action = uiActions.setActiveTool(tool);
-    dispatch(action);
+    dispatch(createProjectAction<SetActiveToolAction>(ProjectActionType.SET_ACTIVE_TOOL, { tool }, { trackable: false }));
   }, []);
 
   const setZoom = useCallback((pixelsPerBeat: number) => {
-    const action = uiActions.setZoom(pixelsPerBeat);
-    dispatch(action);
+    dispatch(createProjectAction<SetZoomAction>(ProjectActionType.SET_ZOOM, { pixelsPerBeat }, { trackable: false }));
   }, []);
 
   const setScrollPosition = useCallback((horizontal: number, vertical: number) => {
-    const action = uiActions.setScrollPosition(horizontal, vertical);
-    dispatch(action);
+    dispatch(createProjectAction<SetScrollPositionAction>(ProjectActionType.SET_SCROLL_POSITION, { horizontal, vertical }, { trackable: false }));
   }, []);
 
   const toggleSettings = useCallback((open: boolean) => {
-    const action = createProjectAction(
-      ProjectActionType.TOGGLE_SETTINGS,
-      { open },
-      { trackable: false }
-    );
-    dispatch(action);
+    dispatch(createProjectAction<ToggleSettingsAction>(ProjectActionType.TOGGLE_SETTINGS, { open }, { trackable: false }));
   }, []);
 
-  // History Actions
   const toggleHistoryDrawer = useCallback((open: boolean) => {
-    const action = createProjectAction<ToggleHistoryDrawerAction>(
-      ProjectActionType.TOGGLE_HISTORY_DRAWER,
-      { open },
-      { trackable: false }
-    );
-    dispatch(action);
+    dispatch(createProjectAction<ToggleHistoryDrawerAction>(ProjectActionType.TOGGLE_HISTORY_DRAWER, { open }, { trackable: false }));
   }, []);
 
   const restoreToTimestamp = useCallback((timestamp: number) => {
-    const { userId, userName } = getCurrentUser();
-    const action = createProjectAction<RestoreToTimestampAction>(
-      ProjectActionType.RESTORE_TO_TIMESTAMP,
-      { timestamp },
-      {
-        userId,
-        userName,
-        description: `Restored project to timestamp ${new Date(timestamp).toLocaleString()}`,
-      }
-    );
-    dispatch(action);
-    sendMessage(ActionType.RESTORE_TO_TIMESTAMP, { timestamp });
-  }, [getCurrentUser]);
-
-  // Legacy support functions for existing code
-  const connectToProject = useCallback(async (projectId: string) => {
-    try {
-      webSocketService.connectToProject(projectId);
-      
-      // Update local state
-      const action = createProjectAction(
-        ProjectActionType.UPDATE_PROJECT_SETTINGS,
-        { settings: { projectId } },
-        { trackable: false }
-      );
-      dispatch(action);
-    } catch (error) {
-      console.error("Failed to connect to project:", error);
-      throw error;
-    }
+    dispatch(createProjectAction<RestoreToTimestampAction>(ProjectActionType.RESTORE_TO_TIMESTAMP, { timestamp }, { trackable: false }));
   }, []);
+
+  // Legacy support for existing code
+  const connectToProject = useCallback(async (projectId: string) => {
+    webSocketService.setLocalUserData({ userName: state.localUserName, userId: state.localUserId });
+    webSocketService.connectToProject(projectId)
+  }, [state.localUserId, state.localUserName])
 
   const disconnectFromProject = useCallback(() => {
-    webSocketService.disconnectFromProject();
-    
-    // Reset project state
-    const action = createProjectAction(
-      ProjectActionType.LOAD_PROJECT,
-      {
-        id: null,
-        name: null,
-        bpm: 120,
-        masterVolume: 80,
-        settings: initialProjectState.project.settings,
-        tracks: [],
-        blocks: []
-      },
-      { trackable: false }
-    );
-    dispatch(action);
+    webSocketService.disconnectFromProject()
   }, []);
 
-  const sendMessage = useCallback((action: ActionType, params: any): string => {
+  const sendMessage = useCallback((action: ActionType, params): string => {
     return webSocketService.sendMessage(action, params);
   }, []);
 
-  const sendGeneralMessage = useCallback((message: any) => {
+  const messageHistory = webSocketService.getMessageHistory();
+
+  const updateUserName = useCallback((userName: string) => {
+    webSocketService.setLocalUserName(userName);
+    dispatch(createProjectAction(ProjectActionType.UPDATE_USER_PRESENCE, { userName }, { trackable: false }));
+  }, []);
+
+  const setRemoteUsers = useCallback((users) => {
+    dispatch({ type: ProjectActionType.SET_REMOTE_USERS, payload: { users }})
+  }, [])
+
+  const sendGeneralMessage = useCallback((message: GeneralMessage) => {
     webSocketService.sendGeneralMessage(message);
   }, []);
 
-  const updateUserName = useCallback((userName: string) => {
-    const action = createProjectAction(
-      ProjectActionType.UPDATE_USER_PRESENCE,
-      { 
-        userId: state.localUserId,
-        userName,
-        connected: state.isConnected
-      },
-      { trackable: false }
-    );
-    dispatch(action);
-    
-    webSocketService.updateUserName(userName);
-  }, [state.localUserId, state.isConnected]);
-
-  // Legacy state mappings
-  const messageHistory: UserInteractionMessage[] = webSocketService.getMessageHistory();
-  const historyVisible = state.historyVisible;
-  const setHistoryVisible = toggleHistoryDrawer;
-  const selectedHistoryIndex = state.selectedHistoryIndex;
   const setSelectedHistoryIndex = useCallback((index: number | null) => {
-    const action = createProjectAction(
-      ProjectActionType.ADD_HISTORY_ENTRY,
-      {
-        id: `selection-${Date.now()}`,
-        timestamp: Date.now(),
-        action: 'SELECT_HISTORY',
-        description: `Selected history entry ${index}`,
-        userId: state.localUserId,
-        userName: state.localUserName,
-        details: { selectedIndex: index }
-      },
-      { trackable: false }
-    );
-    dispatch(action);
-  }, [state.localUserId, state.localUserName]);
+    dispatch(createProjectAction(ProjectActionType.RESTORE_TO_TIMESTAMP, { index }, { trackable: false }));
+  }, []);
 
-  // WebSocket event handlers
+  const setHistoryVisible = useCallback((visible: boolean) => {
+    dispatch(createProjectAction(ProjectActionType.TOGGLE_HISTORY_DRAWER, { visible }, { trackable: false }));
+  }, []);
+
   useEffect(() => {
     const handleConnected = (data: { userId: string, projectId: string }) => {
-      const action = createProjectAction(
-        ProjectActionType.UPDATE_USER_PRESENCE,
-        {
-          userId: data.userId,
-          connected: true
-        },
-        { trackable: false }
-      );
-      dispatch(action);
+      console.log('Connected to project:', data.projectId, 'as user:', data.userId);
     };
-    
-    const handlePresenceSync = (presenceState: any) => {
+
+    const handlePresenceSync = (presenceState) => {
       const collaborators = Object.values(presenceState)
-        .flat()
-        .filter((user: any) => user.userId !== state.localUserId)
+        .filter((user: any) => user && user.userId !== state.localUserId)
         .map((user: any) => ({
-          id: user.userId,
-          name: user.userName || 'Anonymous',
-          color: generateUserColor(user.userId),
-          position: { x: 0, y: 0 }
-        }));
-      
-      // Update remote users
-      collaborators.forEach((user: any) => {
-        const action = createProjectAction(
-          ProjectActionType.USER_JOINED,
-          {
-            userId: user.id,
-            userName: user.name,
-            color: user.color,
-            position: user.position
-          },
-          { trackable: false }
-        );
-        dispatch(action);
-      });
+          userId: user?.userId,
+          userName: user?.userName || 'Anonymous',
+          color: generateUserColor(user.userId || String(user))
+        }))
+
+      setRemoteUsers(collaborators)
+    }
+
+    const handleCursorMove = (data) => {
+      dispatch({ type: ProjectActionType.SET_REMOTE_USER_CURSOR_POSITION, payload: data })
     };
-    
-    const handleCursorMove = (data: any) => {
-      if (data.userId === state.localUserId) return;
-      
-      const action = createProjectAction(
-        ProjectActionType.UPDATE_USER_PRESENCE,
-        {
-          userId: data.userId,
-          position: { x: data.x, y: data.y }
-        },
-        { trackable: false }
-      );
-      dispatch(action);
-    };
-    
+
     const handleConnectionStatusChanged = (data: { status: 'connecting' | 'connected' | 'disconnected' }) => {
-      const action = createProjectAction(
-        ProjectActionType.UPDATE_USER_PRESENCE,
-        {
-          userId: state.localUserId,
-          connected: data.status === 'connected'
-        },
-        { trackable: false }
-      );
-      dispatch(action);
+      console.log('Connection status changed:', data.status);
     };
-    
+
     webSocketService.on('connected', handleConnected);
     webSocketService.on('presenceSync', handlePresenceSync);
     webSocketService.on('cursorMove', handleCursorMove);
     webSocketService.on('connectionStatusChanged', handleConnectionStatusChanged);
-    
+
     return () => {
       webSocketService.off('connected', handleConnected);
       webSocketService.off('presenceSync', handlePresenceSync);
       webSocketService.off('cursorMove', handleCursorMove);
       webSocketService.off('connectionStatusChanged', handleConnectionStatusChanged);
     };
-  }, [state.localUserId]);
-
-  // Helper function to generate user colors
-  const generateUserColor = (userId: string): string => {
-    let hash = 0;
-    for (let i = 0; i < userId.length; i++) {
-      hash = userId.charCodeAt(i) + ((hash << 5) - hash);
-    }
-    const hue = Math.abs(hash) % 360;
-    return `hsl(${hue}, 70%, 65%)`;
-  };
+  }, [state.localUserId, state.localUserName]);
 
   const contextValue: ProjectContextType = {
-    // State
     state,
-    
-    // Project Management
     loadProject,
     setProjectLoading,
     setProjectError,
     updateProjectSettings,
-    
-    // Playback Actions
     play,
     pause,
     restart,
     setCurrentBeat,
     setBpm,
     setMasterVolume,
-    
-    // Track Actions
     addTrack,
     removeTrack,
     renameTrack,
@@ -907,8 +1081,6 @@ export const ProjectProvider = ({ children }: ProjectProviderProps) => {
     armTrack,
     lockTrack,
     unlockTrack,
-    
-    // Block Actions
     addBlock,
     removeBlock,
     updateBlock,
@@ -917,27 +1089,26 @@ export const ProjectProvider = ({ children }: ProjectProviderProps) => {
     duplicateBlock,
     startEditingBlock,
     endEditingBlock,
-    
-    // UI Actions
+    uploadAudioFile,
+    deleteAudioFile,
+    addMarker,
+    updateMarker,
+    removeMarker,
     selectBlock,
     deselectBlock,
     setActiveTool,
     setZoom,
     setScrollPosition,
     toggleSettings,
-    
-    // History Actions
     toggleHistoryDrawer,
     restoreToTimestamp,
-    
-    // Legacy support
     connectToProject,
     disconnectFromProject,
     sendMessage,
     messageHistory,
-    historyVisible,
+    // historyVisible,
     setHistoryVisible,
-    selectedHistoryIndex,
+    // selectedHistoryIndex,
     setSelectedHistoryIndex,
     updateUserName,
     sendGeneralMessage,
@@ -953,7 +1124,7 @@ export const ProjectProvider = ({ children }: ProjectProviderProps) => {
 export const useProject = (): ProjectContextType => {
   const context = useContext(ProjectContext);
   if (context === undefined) {
-    throw new Error('useProject must be used within a ProjectProvider');
+    throw new Error("useProject must be used within a ProjectProvider");
   }
   return context;
 };

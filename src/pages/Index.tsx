@@ -60,23 +60,23 @@ const Index = () => {
     // Legacy support
     sendGeneralMessage
   } = useProject();
-  
+
   const navigate = useNavigate();
-  
+
   // Refs for DOM elements
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const timelineRef = useRef<HTMLDivElement>(null);
   const trackListRef = useRef<HTMLDivElement>(null);
-  
+
   // Local UI state that doesn't belong in global context
   const [containerWidth, setContainerWidth] = useState(0);
   const [clipPopupPosition, setClipPopupPosition] = useState({ x: 0, y: 0 });
-  
+
   // Drag and drop state
   const [isDragOver, setIsDragOver] = useState(false);
   const [dragPosition, setDragPosition] = useState<{x: number, y: number} | null>(null);
   const [placeholderBlock, setPlaceholderBlock] = useState<{track: number, startBeat: number, lengthBeats: number} | null>(null);
-  
+
   // Derived values from context state
   const isPlaying = state.isPlaying;
   const bpm = state.project.bpm;
@@ -96,15 +96,14 @@ const Index = () => {
   const showCollaborators = settings.showCollaborators;
   const horizontalScrollPosition = state.scrollPosition.horizontal;
   const verticalScrollPosition = state.scrollPosition.vertical;
-  
-  // Remote users from context collaborators
-  const remoteUsers = state.collaborators.map(collaborator => ({
+
+  const remoteUsers = state.remoteUsers.map(collaborator => ({
     id: collaborator.id,
     name: collaborator.name,
     position: collaborator.position,
     color: collaborator.color
   }));
-  
+
   // Initialize with default tracks and blocks for demo
   useEffect(() => {
     if (tracks.length === 0) {
@@ -115,11 +114,11 @@ const Index = () => {
         { name: 'Synth', color: '#64C850', volume: 70, muted: false, solo: false, armed: false },
         { name: 'Vocals', color: '#5096FF', volume: 85, muted: false, solo: false, armed: false },
       ];
-      
+
       defaultTracks.forEach(trackData => {
         addTrack(trackData);
       });
-      
+
       // Add default blocks after a brief delay to ensure tracks are created
       setTimeout(() => {
         const defaultBlocks = [
@@ -129,7 +128,7 @@ const Index = () => {
           { name: 'Synth Lead', track: 2, startBeat: 12, lengthBeats: 6, volume: 65, pitch: 0 },
           { name: 'Vocal Chop', track: 3, startBeat: 16, lengthBeats: 8, volume: 85, pitch: 2 },
         ];
-        
+
         defaultBlocks.forEach(blockData => {
           addBlock(blockData);
         });
@@ -146,22 +145,22 @@ const Index = () => {
 
   const calculateDropPosition = (e: React.DragEvent<HTMLDivElement>) => {
     if (!scrollContainerRef.current) return null;
-    
+
     const rect = scrollContainerRef.current.getBoundingClientRect();
     const x = e.clientX - rect.left + horizontalScrollPosition;
     const y = e.clientY - rect.top + verticalScrollPosition;
-    
+
     const trackIndex = Math.floor(y / trackHeight);
     let beatPosition = x / pixelsPerBeat;
-    
+
     // Apply snapping if enabled
     if (settings.snapToGrid) {
       beatPosition = Math.round(beatPosition / settings.gridSize) * settings.gridSize;
     }
-    
+
     // Default block length (can be made configurable)
     const defaultLength = 4;
-    
+
     return {
       track: Math.max(0, Math.min(trackIndex, tracks.length - 1)),
       startBeat: Math.max(0, beatPosition),
@@ -184,13 +183,13 @@ const Index = () => {
   const handleToggleLock = (blockId: string) => {
     const block = blocks.find(b => b.id === blockId);
     if (!block) return;
-    
+
     if (block.editingUserId) {
       endEditingBlock(blockId);
     } else {
       startEditingBlock(blockId);
     }
-    
+
     toast({
       title: "Block Lock Changed",
       description: "Block editing status has been updated.",
@@ -200,7 +199,7 @@ const Index = () => {
   const handleOpenProperties = (blockId: string) => {
     const block = blocks.find(block => block.id === blockId);
     if (!block) return;
-    
+
     if (block.editingUserId && block.editingUserId !== state.localUserId) {
       toast({
         title: "Block is being edited",
@@ -226,9 +225,9 @@ const Index = () => {
   };
 
   const isTrackLocked = (trackIndex: number): boolean => {
-    return blocks.some(block => 
-      block.track === trackIndex && 
-      block.editingUserId && 
+    return blocks.some(block =>
+      block.track === trackIndex &&
+      block.editingUserId &&
       block.editingUserId !== state.localUserId
     );
   };
@@ -252,7 +251,7 @@ const Index = () => {
 
     startEditingBlock(id);
     selectBlock(id);
-    
+
     // Update clip popup position for UI
     if (scrollContainerRef.current && block) {
       const blockX = block.startBeat * pixelsPerBeat;
@@ -272,13 +271,13 @@ const Index = () => {
     if (trackArea) {
       trackArea.classList.add('project-area');
     }
-    
+
     // Send a general message to notify others that we've joined
     sendGeneralMessage({
       type: 'user_joined',
       message: `${state.localUserName} joined the session`
     });
-    
+
     // Listen for general messages
     const handleGeneralMessage = (message: any) => {
       if (message.type === 'user_joined' && message.userId !== state.localUserId) {
@@ -288,12 +287,12 @@ const Index = () => {
         });
       }
     };
-    
+
     const webSocketService = window.getWebSocketService?.();
     if (webSocketService) {
       webSocketService.on('generalMessage', handleGeneralMessage);
     }
-    
+
     return () => {
       if (webSocketService) {
         webSocketService.off('generalMessage', handleGeneralMessage);
@@ -315,9 +314,9 @@ const Index = () => {
     if (settings.snapToGrid) {
       adjustedStartBeat = Math.round(newStartBeat / settings.gridSize) * settings.gridSize;
     }
-    
+
     moveBlock(id, newTrack, adjustedStartBeat);
-    
+
     // Notify other users about the block move
     sendGeneralMessage({
       type: 'block_moved',
@@ -331,10 +330,10 @@ const Index = () => {
   const handleBlockLengthChange = (id: string, newLength: number) => {
     let adjustedLength = newLength;
     if (settings.snapToGrid) {
-      adjustedLength = Math.max(settings.gridSize, 
+      adjustedLength = Math.max(settings.gridSize,
         Math.round(newLength / settings.gridSize) * settings.gridSize);
     }
-    
+
     resizeBlock(id, adjustedLength);
   };
 
@@ -388,7 +387,7 @@ const Index = () => {
         lockTrack(trackId);
       }
     }
-    
+
     toast({
       title: "Track Lock Changed",
       description: "Track locking status has been updated.",
@@ -397,7 +396,7 @@ const Index = () => {
 
   const handleTrackRename = (trackId: string, newName: string) => {
     renameTrack(trackId, newName);
-    
+
     toast({
       title: "Track Renamed",
       description: `Track has been renamed to "${newName}".`,
@@ -414,18 +413,18 @@ const Index = () => {
   const handleAddTrack = () => {
     const colors = ['#FF466A', '#FFB446', '#64C850', '#5096FF'];
     const newColor = colors[tracks.length % colors.length];
-    
-    const newTrackData = { 
-      name: `Track ${tracks.length + 1}`, 
-      color: newColor, 
-      volume: 75, 
-      muted: false, 
+
+    const newTrackData = {
+      name: `Track ${tracks.length + 1}`,
+      color: newColor,
+      volume: 75,
+      muted: false,
       solo: false,
       armed: false
     };
-    
+
     addTrack(newTrackData);
-    
+
     toast({
       title: "Track Added",
       description: "A new track has been added to your composition.",
@@ -447,7 +446,7 @@ const Index = () => {
   const handleDeleteBlock = (id: string) => {
     removeBlock(id);
     deselectBlock();
-    
+
     toast({
       title: "Clip Deleted",
       description: "The audio clip has been removed from your track.",
@@ -478,7 +477,7 @@ const Index = () => {
 
   useEffect(() => {
     if (!isPlaying) return;
-    
+
     const interval = setInterval(() => {
       setCurrentBeat(prev => {
         const totalBeats = totalBars * beatsPerBar;
@@ -486,7 +485,7 @@ const Index = () => {
         return next;
       });
     }, 60000 / bpm / 10);
-    
+
     return () => clearInterval(interval);
   }, [isPlaying, bpm, beatsPerBar, totalBars]);
 
@@ -502,12 +501,12 @@ const Index = () => {
   const handleDragEnter = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     e.stopPropagation();
-    
+
     // Check if any files being dragged are audio files
-    const hasAudioFiles = Array.from(e.dataTransfer.items).some(item => 
+    const hasAudioFiles = Array.from(e.dataTransfer.items).some(item =>
       item.kind === 'file' && isAudioFile(item.getAsFile()!)
     );
-    
+
     if (hasAudioFiles) {
       setIsDragOver(true);
     }
@@ -516,9 +515,9 @@ const Index = () => {
   const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     e.stopPropagation();
-    
+
     if (!isDragOver) return;
-    
+
     const position = calculateDropPosition(e);
     if (position) {
       setPlaceholderBlock(position);
@@ -529,7 +528,7 @@ const Index = () => {
   const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     e.stopPropagation();
-    
+
     // Only clear drag state if leaving the container entirely
     if (!e.currentTarget.contains(e.relatedTarget as Node)) {
       setIsDragOver(false);
@@ -541,14 +540,14 @@ const Index = () => {
   const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     e.stopPropagation();
-    
+
     setIsDragOver(false);
     setPlaceholderBlock(null);
     setDragPosition(null);
-    
+
     const files = Array.from(e.dataTransfer.files);
     const audioFiles = files.filter(isAudioFile);
-    
+
     if (audioFiles.length === 0) {
       toast({
         title: "Invalid File Type",
@@ -557,10 +556,10 @@ const Index = () => {
       });
       return;
     }
-    
+
     const dropPosition = calculateDropPosition(e);
     if (!dropPosition) return;
-    
+
     // Create audio blocks for each dropped file
     audioFiles.forEach((file, index) => {
       const fileName = file.name.replace(/\.[^/.]+$/, ""); // Remove extension
@@ -573,10 +572,10 @@ const Index = () => {
         pitch: 0,
         fileId: `file-${Date.now()}-${index}` // Placeholder file ID
       };
-      
+
       addBlock(blockData);
     });
-    
+
     toast({
       title: "Audio Files Added",
       description: `Added ${audioFiles.length} audio block${audioFiles.length > 1 ? 's' : ''} to track ${dropPosition.track + 1}`,
@@ -599,8 +598,8 @@ const Index = () => {
 
   const getTrackEditingUserId = (trackIndex: number) => {
     return blocks.find(
-      block => block.track === trackIndex && 
-               block.editingUserId && 
+      block => block.track === trackIndex &&
+               block.editingUserId &&
                block.editingUserId !== state.localUserId
     )?.editingUserId || null;
   };
@@ -630,7 +629,7 @@ const Index = () => {
       });
 
       const projectId = await createSampleProject();
-      
+
       toast({
         title: "Sample Project Created!",
         description: "Navigating to your new project...",
@@ -651,18 +650,18 @@ const Index = () => {
   return (
     <div className={ui.layout.fullScreen}>
       <div className={ui.overlay.gradient} />
-      
+
       {/* Sample Project Button */}
       <div className="absolute top-4 right-4 z-20">
-        <Button 
+        <Button
           onClick={handleCreateSampleProject}
           className="bg-primary hover:bg-primary/90"
         >
           Create Sample Project
         </Button>
       </div>
-      
-      <ToolbarWithStatus 
+
+      <ToolbarWithStatus
         isPlaying={isPlaying}
         bpm={bpm}
         volume={masterVolume}
@@ -681,9 +680,9 @@ const Index = () => {
         historyVisible={historyVisible}
         onToggleHistory={() => toggleHistoryDrawer(!historyVisible)}
       />
-      
+
       <div className="flex flex-grow overflow-hidden z-10">
-        <TrackList 
+        <TrackList
           ref={trackListRef}
           tracks={tracksWithLockInfo}
           onVolumeChange={handleTrackVolumeChange}
@@ -697,9 +696,9 @@ const Index = () => {
           onTrackListScroll={handleTrackListScroll}
           localUserId={state.localUserId}
         />
-        
+
         <div className="flex-grow overflow-hidden flex flex-col">
-          <Timeline 
+          <Timeline
             ref={timelineRef}
             width={containerWidth}
             pixelsPerBeat={pixelsPerBeat}
@@ -714,8 +713,8 @@ const Index = () => {
             onSeek={handleSeek}
             scrollLeft={horizontalScrollPosition}
           />
-          
-          <div 
+
+          <div
             ref={scrollContainerRef}
             className={`${ui.layout.growContainer} project-area ${isDragOver ? 'bg-primary/5' : ''}`}
             onClick={handleContainerClick}
@@ -726,9 +725,9 @@ const Index = () => {
             onDragLeave={handleDragLeave}
             onDrop={handleDrop}
           >
-            <div 
+            <div
               className="absolute inset-0"
-              style={{ 
+              style={{
                 width: `${totalBars * beatsPerBar * pixelsPerBeat}px`,
                 minHeight: `${tracks.length * trackHeight}px`
               }}
@@ -736,17 +735,17 @@ const Index = () => {
               {tracks.map((_, index) => {
                 const editingUserId = getTrackEditingUserId(index);
                 const userColor = getUserColor(editingUserId);
-                
+
                 return (
                   <div key={index} className="track-edited-by-user absolute left-0 right-0">
-                    <div 
+                    <div
                       className="absolute left-0 right-0 border-b border-border"
-                      style={{ 
+                      style={{
                         top: `${(index + 1) * trackHeight}px`,
                       }}
                     />
                     {editingUserId && (
-                      <div 
+                      <div
                         className="absolute pointer-events-none"
                         style={{
                           top: `${index * trackHeight}px`,
@@ -782,7 +781,7 @@ const Index = () => {
 
               {/* Enhanced blocks with drag-and-drop */}
               {blocks.map(block => (
-                <TrackBlock 
+                <TrackBlock
                   key={block.id}
                   id={block.id}
                   track={block.track}
@@ -811,9 +810,9 @@ const Index = () => {
                 />
               ))}
 
-              <div 
+              <div
                 className="playhead"
-                style={{ 
+                style={{
                   left: `${currentBeat * pixelsPerBeat}px`,
                   height: '100%',
                   position: 'absolute',
@@ -825,11 +824,11 @@ const Index = () => {
         </div>
       </div>
 
-      <ProjectHistoryDrawer 
+      <ProjectHistoryDrawer
         open={historyVisible}
         onOpenChange={toggleHistoryDrawer}
       />
-      
+
       <SettingsDialog
         open={isSettingsOpen}
         onOpenChange={toggleSettings}

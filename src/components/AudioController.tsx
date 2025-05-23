@@ -7,55 +7,21 @@ import { toast } from "@/hooks/use-toast";
 import { getAudioEngine, AudioSequenceItem } from '@/utils/AudioEngine';
 import FrequencyDrawer from './FrequencyDrawer';
 
-// Define a simple demo sequence
-const demoSequence: AudioSequenceItem[] = [
-  { src: '/audio/drums.mp3', startTime: 0 },
-  { src: '/audio/bass.mp3', startTime: 2000 },
-  { src: '/audio/synth.mp3', startTime: 4000 },
-  { src: '/audio/vocals.mp3', startTime: 8000 },
-];
-
 const AudioController: React.FC = () => {
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [isPaused, setIsPaused] = useState(false);
-  const [isLoaded, setIsLoaded] = useState(false);
   const [volume, setVolume] = useState(80);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   
-  // Initialize audio engine and load audio files
+  // Initialize audio engine
   useEffect(() => {
     const audioEngine = getAudioEngine();
-    
-    const loadAudio = async () => {
-      try {
-        await audioEngine.loadSequence(demoSequence);
-        setIsLoaded(true);
-        setDuration(audioEngine.getTotalDuration());
-        toast({
-          title: "Audio loaded",
-          description: "All audio files have been successfully loaded.",
-        });
-      } catch (error) {
-        console.error("Failed to load audio:", error);
-        toast({
-          title: "Error loading audio",
-          description: "There was a problem loading the audio files.",
-          variant: "destructive",
-        });
-      }
-    };
-    
-    loadAudio();
     
     // Set initial volume
     audioEngine.setVolume(volume);
     
-    return () => {
-      // Cleanup on unmount
-      audioEngine.stop();
-    };
-  }, []);
+    // Update duration from engine
+    setDuration(audioEngine.getTotalDuration());
+  }, [volume]);
   
   // Update volume when it changes
   useEffect(() => {
@@ -65,19 +31,14 @@ const AudioController: React.FC = () => {
   
   // Update current time during playback
   useEffect(() => {
-    if (!isPlaying) return;
-    
     const audioEngine = getAudioEngine();
     let animationFrame: number;
     
     const updateTime = () => {
       setCurrentTime(audioEngine.getCurrentTime());
+      setDuration(audioEngine.getTotalDuration());
       
-      // Check if playback has reached the end
-      if (audioEngine.getCurrentTime() >= duration) {
-        setIsPlaying(false);
-        setIsPaused(false);
-      } else {
+      if (audioEngine.isAudioPlaying()) {
         animationFrame = requestAnimationFrame(updateTime);
       }
     };
@@ -87,7 +48,7 @@ const AudioController: React.FC = () => {
     return () => {
       cancelAnimationFrame(animationFrame);
     };
-  }, [isPlaying, duration]);
+  }, []);
   
   const formatTime = (timeMs: number): string => {
     const totalSeconds = Math.floor(timeMs / 1000);
@@ -97,32 +58,18 @@ const AudioController: React.FC = () => {
   };
   
   const handlePlay = () => {
-    if (!isLoaded) {
-      toast({
-        title: "Still loading",
-        description: "Audio files are still being loaded. Please wait.",
-      });
-      return;
-    }
-    
     const audioEngine = getAudioEngine();
     audioEngine.play();
-    setIsPlaying(true);
-    setIsPaused(false);
   };
   
   const handlePause = () => {
     const audioEngine = getAudioEngine();
     audioEngine.pause();
-    setIsPaused(true);
-    setIsPlaying(false);
   };
   
   const handleStop = () => {
     const audioEngine = getAudioEngine();
     audioEngine.stop();
-    setIsPlaying(false);
-    setIsPaused(false);
     setCurrentTime(0);
   };
 
@@ -134,17 +81,23 @@ const AudioController: React.FC = () => {
         <Button 
           variant="outline" 
           className="w-16 h-16 rounded-full"
-          onClick={isPlaying ? handlePause : handlePlay}
-          disabled={!isLoaded}
+          onClick={handlePlay}
         >
-          {isPlaying ? <Pause size={24} /> : <Play size={24} />}
+          <Play size={24} />
+        </Button>
+        
+        <Button 
+          variant="outline" 
+          className="w-16 h-16 rounded-full"
+          onClick={handlePause}
+        >
+          <Pause size={24} />
         </Button>
         
         <Button 
           variant="outline" 
           className="w-16 h-16 rounded-full"
           onClick={handleStop}
-          disabled={!isLoaded || (!isPlaying && !isPaused)}
         >
           <Square size={24} />
         </Button>
@@ -175,7 +128,7 @@ const AudioController: React.FC = () => {
       </div>
       
       {/* Frequency graph drawer */}
-      <FrequencyDrawer isPlaying={isPlaying} />
+      <FrequencyDrawer isPlaying={getAudioEngine().isAudioPlaying()} />
     </div>
   );
 };

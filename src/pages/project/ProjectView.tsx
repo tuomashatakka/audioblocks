@@ -5,6 +5,7 @@ import { Loader2, AlertCircle } from 'lucide-react';
 import TrackList from '@/components/TrackList';
 import TrackBlock from '@/components/TrackBlock';
 import Timeline from '@/components/Timeline';
+import CompositionGridView from '@/components/CompositionGridView';
 import SettingsDialog from '@/components/SettingsDialog';
 import RemoteUser from '@/components/RemoteUser';
 import ClipEditPopup from '@/components/ClipEditPopup';
@@ -18,6 +19,7 @@ import { ActionType } from '@/types/collaborative';
 import { ui } from '@/styles/ui-classes';
 import ToolbarWithStatus from '@/components/ToolbarWithStatus';
 import { supabase } from '@/integrations/supabase/client';
+import { getAudioEngine } from '@/utils/AudioEngine';
 
 // Fetch project data from Supabase
 const fetchProjectData = async (projectId: string) => {
@@ -167,6 +169,10 @@ const ProjectView: React.FC = () => {
     toggleSettings,
     // History actions
     toggleHistoryDrawer,
+    // Marker actions
+    addMarker,
+    updateMarker,
+    removeMarker,
     // Legacy support
     connectToProject,
     sendMessage,
@@ -203,8 +209,9 @@ const ProjectView: React.FC = () => {
   const totalBars = state.totalBars;
   const activeTool = state.activeTool;
   const settings = state.project.settings;
-  const tracks = state.tracks;
-  const blocks = state.blocks;
+  const tracks = state.tracks || [];
+  const blocks = useMemo(() => state.blocks || [], [ state.blocks ]);
+  const markers = state.markers;
   const historyVisible = state.historyVisible;
   const showCollaborators = settings.showCollaborators;
   const horizontalScrollPosition = state.scrollPosition.horizontal;
@@ -296,10 +303,14 @@ const ProjectView: React.FC = () => {
   };
 
   // Helper functions for drag and drop
-  const isAudioFile = (file: File): boolean => {
+  const isAudioFile = (file: File | null): boolean => {
+    if (!file) return false;
+    
     const audioExtensions = ['.mp3', '.wav', '.ogg', '.m4a', '.aac', '.flac', '.wma'];
-    const fileName = file?.name.toLowerCase();
-    return fileName ? audioExtensions.some(ext => fileName.endsWith(ext)) : false
+    const fileName = file.name?.toLowerCase();
+    
+    // Check MIME type first, then fallback to file extension
+    return file.type.startsWith('audio/') || (fileName ? audioExtensions.some(ext => fileName.endsWith(ext)) : false);
   };
 
   const calculateDropPosition = (e: React.DragEvent<HTMLDivElement>) => {
@@ -317,8 +328,8 @@ const ProjectView: React.FC = () => {
       beatPosition = Math.round(beatPosition / settings.gridSize) * settings.gridSize;
     }
 
-    // Default block length (can be made configurable)
-    const defaultLength = 4;
+    // Default block length (1 bar)
+    const defaultLength = beatsPerBar;
 
     return {
       track: Math.max(0, Math.min(trackIndex, tracks.length - 1)),
@@ -496,8 +507,13 @@ const ProjectView: React.FC = () => {
     resizeBlock(id, adjustedLength);
   };
 
-  const handlePlay = () => {
-    play();
+  const handlePlay = async () => {
+    await play();
+
+    // Start AudioEngine playback
+    const audioEngine = getAudioEngine();
+    audioEngine.play();
+
     toast({
       title: "Playback Started",
       description: "Your composition is now playing.",
@@ -506,10 +522,19 @@ const ProjectView: React.FC = () => {
 
   const handlePause = () => {
     pause();
+
+    // Pause AudioEngine
+    const audioEngine = getAudioEngine();
+    audioEngine.pause();
   };
 
-  const handleRestart = () => {
-    restart();
+  const handleRestart = async () => {
+    await restart();
+
+    // Stop and restart AudioEngine
+    const audioEngine = getAudioEngine();
+    audioEngine.stop();
+    audioEngine.play();
   };
 
   const handleTrackVolumeChange = (trackId: string, volume: number) => {
@@ -613,9 +638,22 @@ const ProjectView: React.FC = () => {
     });
   };
 
-  const handleAddMarker = (marker: any) => {};
-  const handleEditMarker = (id: string, changes: any) => {};
-  const handleDeleteMarker = (id: string) => {};
+  const handleAddMarker = (marker: Omit<import('@/components/Timeline').TimelineMarkerData, 'id'>) => {
+    addMarker({
+      position: marker.position,
+      color: marker.color,
+      icon: marker.icon,
+      label: marker.label
+    });
+  };
+
+  const handleEditMarker = (id: string, changes: Partial<import('@/components/Timeline').TimelineMarkerData>) => {
+    updateMarker(id, changes);
+  };
+
+  const handleDeleteMarker = (id: string) => {
+    removeMarker(id);
+  };
 
   const handleSettingsChange = (key: string, value: any) => {
     updateProjectSettings({
@@ -638,9 +676,21 @@ const ProjectView: React.FC = () => {
     if (!isPlaying) return;
 
     const interval = setInterval(() => {
-      const totalBeats = totalBars * beatsPerBar;
-      const next = (currentBeat + 0.1) % totalBeats;
-      setCurrentBeat(next);
+      const audioEngine = getAudioEngine();
+
+      if (audioEngine.isAudioPlaying()) {
+        // Sync with AudioEngine time
+        const currentTimeMs = audioEngine.getCurrentTime();
+        const currentBeatFromAudio = (currentTimeMs / 1000) * (bpm / 60);
+        const totalBeats = totalBars * beatsPerBar;
+
+        setCurrentBeat(currentBeatFromAudio % totalBeats);
+      } else {
+        // Fallback to simulated time progression
+        const totalBeats = totalBars * beatsPerBar;
+        const next = (currentBeat + 0.1) % totalBeats;
+        setCurrentBeat(next);
+      }
     }, 60000 / bpm / 10);
 
     return () => clearInterval(interval);
@@ -661,9 +711,12 @@ const ProjectView: React.FC = () => {
     e.stopPropagation();
 
     // Check if any files being dragged are audio files
-    const hasAudioFiles = Array.from(e.dataTransfer.items).some(item =>
-      item.kind === 'file' && isAudioFile(item.getAsFile()!)
-    );
+    const hasAudioFiles = Array.from(e.dataTransfer.items || []).some(item => {
+      if (item.kind !== 'file') return false;
+      
+      const file = item.getAsFile();
+      return isAudioFile(file);
+    });
 
     if (hasAudioFiles) {
       setIsDragOver(true);
@@ -703,7 +756,7 @@ const ProjectView: React.FC = () => {
     setPlaceholderBlock(null);
     setDragPosition(null);
 
-    const files = Array.from(e.dataTransfer.files);
+    const files = Array.from(e.dataTransfer.items);
     const audioFiles = files.filter(isAudioFile);
 
     if (audioFiles.length === 0) {
@@ -756,9 +809,10 @@ const ProjectView: React.FC = () => {
 
   const getTrackEditingUserId = (trackIndex: number) => {
     return blocks.find(
-      block => block.track === trackIndex &&
-               block.editingUserId &&
-               block.editingUserId !== state.localUserId
+      block =>
+        block.track === trackIndex &&
+        block.editingUserId &&
+        block.editingUserId !== state.localUserId
     )?.editingUserId || null;
   };
 
@@ -855,130 +909,53 @@ const ProjectView: React.FC = () => {
           localUserId={state.localUserId}
         />
 
-        <div className="flex-grow overflow-hidden flex flex-col">
-          <Timeline
-            ref={timelineRef}
-            width={containerWidth}
-            pixelsPerBeat={pixelsPerBeat}
-            beatsPerBar={beatsPerBar}
-            totalBars={totalBars}
-            currentTime={currentTime}
-            totalTime={totalTime}
-            markers={[]}
-            onAddMarker={handleAddMarker}
-            onEditMarker={handleEditMarker}
-            onDeleteMarker={handleDeleteMarker}
-            onSeek={handleSeek}
-            scrollLeft={horizontalScrollPosition}
-          />
-
-          <div
-            ref={scrollContainerRef}
-            className={`${ui.layout.growContainer} project-area ${isDragOver ? 'bg-primary/5' : ''}`}
-            onClick={handleContainerClick}
-            onDoubleClick={handleContainerDoubleClick}
-            onScroll={handleScroll}
-            onDragEnter={handleDragEnter}
-            onDragOver={handleDragOver}
-            onDragLeave={handleDragLeave}
-            onDrop={handleDrop}
-          >
-            <div
-              className="absolute inset-0"
-              style={{
-                width: `${totalBars * beatsPerBar * pixelsPerBeat}px`,
-                minHeight: `${tracks.length * trackHeight}px`
-              }}
-            >
-              {tracks.map((_, index) => {
-                const editingUserId = getTrackEditingUserId(index);
-                const userColor = getUserColor(editingUserId);
-
-                return (
-                  <div key={index} className="track-edited-by-user absolute left-0 right-0">
-                    <div
-                      className="absolute left-0 right-0 border-b border-border"
-                      style={{
-                        top: `${(index + 1) * trackHeight}px`,
-                      }}
-                    />
-                    {editingUserId && (
-                      <div
-                        className="absolute pointer-events-none"
-                        style={{
-                          top: `${index * trackHeight}px`,
-                          left: 0,
-                          right: 0,
-                          height: `${trackHeight}px`,
-                          backgroundColor: userColor,
-                          opacity: 0.1
-                        }}
-                      />
-                    )}
-                  </div>
-                );
-              })}
-
-              {/* Placeholder block for drag and drop */}
-              {placeholderBlock && (
-                <div
-                  className="absolute border-2 border-dashed border-primary bg-primary/20 rounded-md pointer-events-none"
-                  style={{
-                    left: `${placeholderBlock.startBeat * pixelsPerBeat}px`,
-                    top: `${placeholderBlock.track * trackHeight + 4}px`,
-                    width: `${placeholderBlock.lengthBeats * pixelsPerBeat}px`,
-                    height: `${trackHeight - 8}px`,
-                    zIndex: 1000
-                  }}
-                >
-                  <div className="flex items-center justify-center h-full text-primary font-medium text-sm">
-                    Drop Audio Here
-                  </div>
-                </div>
-              )}
-
-              {blocks.map(block => (
-                <TrackBlock
-                  key={block.id}
-                  id={block.id}
-                  track={block.track}
-                  startBeat={block.startBeat}
-                  lengthBeats={block.lengthBeats}
-                  name={block.name}
-                  selected={block.id === selectedBlockId}
-                  onSelect={handleSelectBlock}
-                  onPositionChange={handleBlockPositionChange}
-                  onLengthChange={handleBlockLengthChange}
-                  pixelsPerBeat={pixelsPerBeat}
-                  trackHeight={trackHeight}
-                  editingUserId={block.editingUserId}
-                  isTrackLocked={isTrackLocked(block.track)}
-                  activeTool={activeTool}
-                  localUserId={state.localUserId}
-                  currentBeat={currentBeat}
-                  onDeleteBlock={handleDeleteBlock}
-                  onDuplicateBlock={handleDuplicate}
-                  onBlockNameChange={handleBlockNameChange}
-                  onBlockLockToggle={handleToggleLock}
-                  onOpenBlockProperties={handleOpenProperties}
-                  snapToGridSize={settings.snapToGrid ? settings.gridSize : 0}
-                  gridSize={settings.gridSize}
-                  color={tracks[block.track]?.color}
-                />
-              ))}
-
-              <div
-                className="playhead"
-                style={{
-                  left: `${currentBeat * pixelsPerBeat}px`,
-                  height: '100%',
-                  position: 'absolute',
-                  top: 0
-                }}
-              />
-            </div>
-          </div>
-        </div>
+        <CompositionGridView
+          tracks={tracks}
+          blocks={blocks}
+          currentTime={currentTime}
+          totalTime={totalTime}
+          currentBeat={currentBeat}
+          pixelsPerBeat={pixelsPerBeat}
+          trackHeight={trackHeight}
+          beatsPerBar={beatsPerBar}
+          totalBars={totalBars}
+          containerWidth={containerWidth}
+          selectedBlockId={selectedBlockId}
+          activeTool={activeTool}
+          horizontalScrollPosition={horizontalScrollPosition}
+          verticalScrollPosition={verticalScrollPosition}
+          snapToGrid={settings.snapToGrid}
+          gridSize={settings.gridSize}
+          localUserId={state.localUserId}
+          markers={markers.map(marker => ({
+            id: marker.id,
+            position: marker.position,
+            color: marker.color,
+            icon: marker.icon,
+            label: marker.label
+          }))}
+          onSeek={handleSeek}
+          onScroll={handleScroll}
+          onContainerClick={handleContainerClick}
+          onContainerDoubleClick={handleContainerDoubleClick}
+          onSelectBlock={handleSelectBlock}
+          onBlockPositionChange={handleBlockPositionChange}
+          onBlockLengthChange={handleBlockLengthChange}
+          onDeleteBlock={handleDeleteBlock}
+          onDuplicateBlock={handleDuplicate}
+          onBlockNameChange={handleBlockNameChange}
+          onToggleBlockLock={handleToggleLock}
+          onOpenBlockProperties={handleOpenProperties}
+          onAddMarker={handleAddMarker}
+          onEditMarker={handleEditMarker}
+          onDeleteMarker={handleDeleteMarker}
+          onDragEnter={handleDragEnter}
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          onDrop={handleDrop}
+          isDragOver={isDragOver}
+          placeholderBlock={placeholderBlock}
+        />
       </div>
 
       <ProjectHistoryDrawer

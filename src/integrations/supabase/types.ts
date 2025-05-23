@@ -363,6 +363,50 @@ export type Database = {
         }
         Relationships: []
       }
+      timeline_markers: {
+        Row: {
+          color: string
+          created_at: string | null
+          created_by: string
+          icon: string
+          id: string
+          label: string | null
+          position: number
+          project_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          color: string
+          created_at?: string | null
+          created_by: string
+          icon: string
+          id?: string
+          label?: string | null
+          position: number
+          project_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          color?: string
+          created_at?: string | null
+          created_by?: string
+          icon?: string
+          id?: string
+          label?: string | null
+          position?: number
+          project_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "timeline_markers_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tracks: {
         Row: {
           armed: boolean

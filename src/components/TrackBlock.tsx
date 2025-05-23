@@ -122,35 +122,43 @@ const TrackBlock: React.FC<TrackBlockProps> = ({
     setIsBlockLocked(isTrackLocked);
   }, [isTrackLocked]);
 
-  const handleMouseDown = (e: React.MouseEvent) => {
+  // Unified handler for both mouse and touch events
+  const handlePointerDown = (e: React.MouseEvent | React.TouchEvent) => {
     e.stopPropagation();
 
     if (isTrackLockedByOtherUser || activeTool !== 'select') {
       return;
     }
 
-    onSelect(id);
-
+    // Check if this is a resize handle click/touch
     if ((e.target as HTMLElement).classList.contains('resize-handle')) {
       return;
     }
+
+    onSelect(id);
 
     setIsDragging(true);
     setInitialPos({ track, startBeat });
 
     if (blockRef.current) {
       const rect = blockRef.current.getBoundingClientRect();
+      const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
+      const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
+      
       setDragOffset({
-        x: e.clientX - rect.left,
-        y: e.clientY - rect.top
+        x: clientX - rect.left,
+        y: clientY - rect.top
       });
     }
 
-    document.addEventListener('mousemove', handleMouseMove);
-    document.addEventListener('mouseup', handleMouseUp);
+    // Add both mouse and touch listeners
+    document.addEventListener('mousemove', handlePointerMove);
+    document.addEventListener('mouseup', handlePointerUp);
+    document.addEventListener('touchmove', handlePointerMove, { passive: false });
+    document.addEventListener('touchend', handlePointerUp);
   };
 
-  const handleResizeMouseDown = (e: React.MouseEvent) => {
+  const handleResizePointerDown = (e: React.MouseEvent | React.TouchEvent) => {
     if (isTrackLockedByOtherUser || activeTool !== 'select') {
       if (isTrackLockedByOtherUser) {
         toast({
@@ -167,19 +175,30 @@ const TrackBlock: React.FC<TrackBlockProps> = ({
     setIsResizing(true);
     setInitialLength(lengthBeats);
 
-    document.addEventListener('mousemove', handleResizeMouseMove);
-    document.addEventListener('mouseup', handleResizeMouseUp);
+    // Add both mouse and touch listeners
+    document.addEventListener('mousemove', handleResizePointerMove);
+    document.addEventListener('mouseup', handleResizePointerUp);
+    document.addEventListener('touchmove', handleResizePointerMove, { passive: false });
+    document.addEventListener('touchend', handleResizePointerUp);
   };
 
-  const handleMouseMove = (e: MouseEvent) => {
+  const handlePointerMove = (e: MouseEvent | TouchEvent) => {
     if (!isDragging || !blockRef.current || isTrackLockedByOtherUser) return;
+
+    // Prevent scrolling on touch devices during drag
+    if ('touches' in e) {
+      e.preventDefault();
+    }
 
     const container = blockRef.current.parentElement;
     if (!container) return;
 
     const containerRect = container.getBoundingClientRect();
-    const x = e.clientX - containerRect.left - dragOffset.x + container.scrollLeft;
-    const y = e.clientY - containerRect.top - dragOffset.y + container.scrollTop;
+    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
+    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
+    
+    const x = clientX - containerRect.left - dragOffset.x + container.scrollLeft;
+    const y = clientY - containerRect.top - dragOffset.y + container.scrollTop;
 
     const newTrack = Math.max(0, Math.floor(y / trackHeight));
     let newBeat = Math.max(0, x / pixelsPerBeat);
@@ -197,15 +216,21 @@ const TrackBlock: React.FC<TrackBlockProps> = ({
     }
   };
 
-  const handleResizeMouseMove = (e: MouseEvent) => {
+  const handleResizePointerMove = (e: MouseEvent | TouchEvent) => {
     if (!isResizing || !blockRef.current || isTrackLockedByOtherUser) return;
+
+    // Prevent scrolling on touch devices during resize
+    if ('touches' in e) {
+      e.preventDefault();
+    }
 
     const container = blockRef.current.parentElement;
     if (!container) return;
 
     const containerRect = container.getBoundingClientRect();
+    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
 
-    const rightEdge = e.clientX - containerRect.left + container.scrollLeft;
+    const rightEdge = clientX - containerRect.left + container.scrollLeft;
     const blockLeft = startBeat * pixelsPerBeat;
     const newWidthPixels = Math.max(pixelsPerBeat, rightEdge - blockLeft);
     let newLengthBeats = newWidthPixels / pixelsPerBeat;
@@ -224,16 +249,25 @@ const TrackBlock: React.FC<TrackBlockProps> = ({
     }
   };
 
-  const handleMouseUp = () => {
+  const handlePointerUp = () => {
     setIsDragging(false);
-    document.removeEventListener('mousemove', handleMouseMove);
-    document.removeEventListener('mouseup', handleMouseUp);
+    setIsResizing(false);
+    
+    // Remove all event listeners
+    document.removeEventListener('mousemove', handlePointerMove);
+    document.removeEventListener('mouseup', handlePointerUp);
+    document.removeEventListener('touchmove', handlePointerMove);
+    document.removeEventListener('touchend', handlePointerUp);
   };
 
-  const handleResizeMouseUp = () => {
+  const handleResizePointerUp = () => {
     setIsResizing(false);
-    document.removeEventListener('mousemove', handleResizeMouseMove);
-    document.removeEventListener('mouseup', handleResizeMouseUp);
+    
+    // Remove all event listeners
+    document.removeEventListener('mousemove', handleResizePointerMove);
+    document.removeEventListener('mouseup', handleResizePointerUp);
+    document.removeEventListener('touchmove', handleResizePointerMove);
+    document.removeEventListener('touchend', handleResizePointerUp);
   };
 
   const handleNudgeLeft = () => {
@@ -362,11 +396,16 @@ const TrackBlock: React.FC<TrackBlockProps> = ({
         isTrackLockedByOtherUser ? ui.trackBlock.locked : canInteract ? ui.trackBlock.movable : "cursor-default"
       )}
       style={blockStyle}
-      onMouseDown={handleMouseDown}
+      onMouseDown={handlePointerDown}
+      onTouchStart={handlePointerDown}
       onClick={(e) => {
-        if (!isTrackLockedByOtherUser && activeTool === 'select' && !isResizing) {
-          onSelect(id);
-          e.stopPropagation();
+        // Only handle click if we're not dragging/resizing and it's not on a resize handle
+        if (!isTrackLockedByOtherUser && activeTool === 'select' && !isResizing && !isDragging) {
+          // Don't handle click if it's on the resize handle
+          if (!(e.target as HTMLElement).classList.contains('resize-handle')) {
+            onSelect(id);
+            e.stopPropagation();
+          }
         }
       }}
     >
@@ -437,8 +476,9 @@ const TrackBlock: React.FC<TrackBlockProps> = ({
       {/* Resize handle */}
       {canInteract && (
         <div
-          className={ui.trackBlock.resizeHandle}
-          onMouseDown={handleResizeMouseDown}
+          className={`${ui.trackBlock.resizeHandle} resize-handle`}
+          onMouseDown={handleResizePointerDown}
+          onTouchStart={handleResizePointerDown}
         />
       )}
     </div>

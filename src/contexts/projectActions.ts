@@ -1,4 +1,5 @@
 import { ActionType } from '@/types/collaborative';
+import { Block, ProjectSettings, Track } from './projectReducer';
 
 // Project Action Types
 export enum ProjectActionType {
@@ -7,7 +8,9 @@ export enum ProjectActionType {
   SET_PROJECT_LOADING = 'SET_PROJECT_LOADING',
   SET_PROJECT_ERROR = 'SET_PROJECT_ERROR',
   UPDATE_PROJECT_SETTINGS = 'UPDATE_PROJECT_SETTINGS',
-  
+  SET_REMOTE_USERS = 'SET_REMOTE_USERS',
+  SET_REMOTE_USER_CURSOR_POSITION = 'SET_REMOTE_USER_CURSOR_POSITION',
+
   // Playback Actions
   PLAY = 'PLAY',
   PAUSE = 'PAUSE',
@@ -15,7 +18,7 @@ export enum ProjectActionType {
   SET_CURRENT_BEAT = 'SET_CURRENT_BEAT',
   SET_BPM = 'SET_BPM',
   SET_MASTER_VOLUME = 'SET_MASTER_VOLUME',
-  
+
   // Track Actions
   ADD_TRACK = 'ADD_TRACK',
   REMOVE_TRACK = 'REMOVE_TRACK',
@@ -27,7 +30,7 @@ export enum ProjectActionType {
   ARM_TRACK = 'ARM_TRACK',
   LOCK_TRACK = 'LOCK_TRACK',
   UNLOCK_TRACK = 'UNLOCK_TRACK',
-  
+
   // Block Actions
   ADD_BLOCK = 'ADD_BLOCK',
   REMOVE_BLOCK = 'REMOVE_BLOCK',
@@ -37,7 +40,12 @@ export enum ProjectActionType {
   DUPLICATE_BLOCK = 'DUPLICATE_BLOCK',
   START_EDITING_BLOCK = 'START_EDITING_BLOCK',
   END_EDITING_BLOCK = 'END_EDITING_BLOCK',
-  
+
+  // Marker Actions
+  ADD_MARKER = 'ADD_MARKER',
+  UPDATE_MARKER = 'UPDATE_MARKER',
+  REMOVE_MARKER = 'REMOVE_MARKER',
+
   // UI Actions
   SELECT_BLOCK = 'SELECT_BLOCK',
   DESELECT_BLOCK = 'DESELECT_BLOCK',
@@ -45,16 +53,20 @@ export enum ProjectActionType {
   SET_ZOOM = 'SET_ZOOM',
   SET_SCROLL_POSITION = 'SET_SCROLL_POSITION',
   TOGGLE_SETTINGS = 'TOGGLE_SETTINGS',
-  
+
   // History Actions
   ADD_HISTORY_ENTRY = 'ADD_HISTORY_ENTRY',
   TOGGLE_HISTORY_DRAWER = 'TOGGLE_HISTORY_DRAWER',
   RESTORE_TO_TIMESTAMP = 'RESTORE_TO_TIMESTAMP',
-  
+
   // Collaboration Actions
   USER_JOINED = 'USER_JOINED',
   USER_LEFT = 'USER_LEFT',
   UPDATE_USER_PRESENCE = 'UPDATE_USER_PRESENCE',
+
+  // Audio File Actions
+  UPLOAD_AUDIO_FILE = 'UPLOAD_AUDIO_FILE',
+  DELETE_AUDIO_FILE = 'DELETE_AUDIO_FILE',
 }
 
 // Action Interfaces
@@ -78,9 +90,9 @@ export interface LoadProjectAction extends ProjectAction {
     name: string;
     bpm: number;
     masterVolume: number;
-    settings: any;
-    tracks: any[];
-    blocks: any[];
+    settings: ProjectSettings;
+    tracks: Track[];
+    blocks: Block[];
   };
 }
 
@@ -96,7 +108,7 @@ export interface SetProjectErrorAction extends ProjectAction {
 
 export interface UpdateProjectSettingsAction extends ProjectAction {
   type: ProjectActionType.UPDATE_PROJECT_SETTINGS;
-  payload: { settings: any };
+  payload: { settings: ProjectSettings };
 }
 
 // Playback Actions
@@ -280,6 +292,43 @@ export interface EndEditingBlockAction extends ProjectAction {
   payload: { blockId: string };
 }
 
+// Marker Actions
+export interface AddMarkerAction extends ProjectAction {
+  type: ProjectActionType.ADD_MARKER;
+  payload: {
+    marker: {
+      id: string;
+      position: number;
+      color: string;
+      icon: 'bookmark' | 'flag' | 'star' | 'record' | 'mic' | 'music' | 'zap' | 'comment';
+      label?: string;
+      projectId: string;
+      createdBy: string;
+      createdAt: number;
+    };
+  };
+}
+
+export interface UpdateMarkerAction extends ProjectAction {
+  type: ProjectActionType.UPDATE_MARKER;
+  payload: {
+    markerId: string;
+    changes: {
+      position?: number;
+      color?: string;
+      icon?: 'bookmark' | 'flag' | 'star' | 'record' | 'mic' | 'music' | 'zap' | 'comment';
+      label?: string;
+    };
+  };
+}
+
+export interface RemoveMarkerAction extends ProjectAction {
+  type: ProjectActionType.REMOVE_MARKER;
+  payload: {
+    markerId: string;
+  };
+}
+
 // UI Actions
 export interface SelectBlockAction extends ProjectAction {
   type: ProjectActionType.SELECT_BLOCK;
@@ -310,6 +359,12 @@ export interface ToggleSettingsAction extends ProjectAction {
   payload: { open: boolean };
 }
 
+export interface ToggleHistoryDrawerAction extends ProjectAction {
+  type: ProjectActionType.TOGGLE_HISTORY_DRAWER;
+  payload: { open: boolean };
+
+}
+
 // History Actions
 export interface AddHistoryEntryAction extends ProjectAction {
   type: ProjectActionType.ADD_HISTORY_ENTRY;
@@ -324,9 +379,20 @@ export interface AddHistoryEntryAction extends ProjectAction {
   };
 }
 
-export interface ToggleHistoryDrawerAction extends ProjectAction {
-  type: ProjectActionType.TOGGLE_HISTORY_DRAWER;
-  payload: { open: boolean };
+export interface UploadAudioFileAction extends ProjectAction {
+  type: ProjectActionType.UPLOAD_AUDIO_FILE;
+  payload: {
+    blockId: string;
+    fileId: string;
+  };
+}
+
+export interface DeleteAudioFileAction extends ProjectAction {
+  type: ProjectActionType.DELETE_AUDIO_FILE;
+  payload: {
+    blockId: string;
+    fileId: string;
+  };
 }
 
 export interface RestoreToTimestampAction extends ProjectAction {
@@ -485,14 +551,14 @@ export const blockActions = {
     createProjectAction<MoveBlockAction>(ProjectActionType.MOVE_BLOCK, { blockId, track, startBeat }, {
       userId,
       userName,
-      description: `Moved block "${blockName}" to track ${track + 1}, beat ${startBeat + 1}`,
+      description: `Moved block "${blockName}"`,
     }),
 
   resizeBlock: (blockId: string, lengthBeats: number, blockName: string, userId: string, userName: string) =>
     createProjectAction<ResizeBlockAction>(ProjectActionType.RESIZE_BLOCK, { blockId, lengthBeats }, {
       userId,
       userName,
-      description: `Resized block "${blockName}" to ${lengthBeats} beats`,
+      description: `Resized block "${blockName}"`,
     }),
 
   duplicateBlock: (originalBlockId: string, newBlock: any, userId: string, userName: string) =>
@@ -507,41 +573,65 @@ export const blockActions = {
       userId,
       userName,
       description: `Started editing block "${blockName}"`,
-      trackable: false, // Don't track editing state changes
     }),
 
   endEditingBlock: (blockId: string, blockName: string, userId: string, userName: string) =>
     createProjectAction<EndEditingBlockAction>(ProjectActionType.END_EDITING_BLOCK, { blockId }, {
       userId,
       userName,
-      description: `Stopped editing block "${blockName}"`,
-      trackable: false, // Don't track editing state changes
+      description: `Ended editing block "${blockName}"`,
     }),
-};
 
-export const uiActions = {
   selectBlock: (blockId: string) =>
-    createProjectAction<SelectBlockAction>(ProjectActionType.SELECT_BLOCK, { blockId }, {
-      trackable: false, // Don't track UI state changes
-    }),
+    createProjectAction<SelectBlockAction>(ProjectActionType.SELECT_BLOCK, { blockId }, { trackable: false }),
 
   deselectBlock: () =>
-    createProjectAction<DeselectBlockAction>(ProjectActionType.DESELECT_BLOCK, undefined, {
-      trackable: false, // Don't track UI state changes
-    }),
+    createProjectAction<DeselectBlockAction>(ProjectActionType.DESELECT_BLOCK, undefined, { trackable: false }),
 
   setActiveTool: (tool: string) =>
-    createProjectAction<SetActiveToolAction>(ProjectActionType.SET_ACTIVE_TOOL, { tool }, {
-      trackable: false, // Don't track UI state changes
-    }),
+    createProjectAction<SetActiveToolAction>(ProjectActionType.SET_ACTIVE_TOOL, { tool }, { trackable: false }),
 
   setZoom: (pixelsPerBeat: number) =>
-    createProjectAction<SetZoomAction>(ProjectActionType.SET_ZOOM, { pixelsPerBeat }, {
-      trackable: false, // Don't track UI state changes
-    }),
+    createProjectAction<SetZoomAction>(ProjectActionType.SET_ZOOM, { pixelsPerBeat }, { trackable: false }),
 
   setScrollPosition: (horizontal: number, vertical: number) =>
-    createProjectAction<SetScrollPositionAction>(ProjectActionType.SET_SCROLL_POSITION, { horizontal, vertical }, {
-      trackable: false, // Don't track UI state changes
+    createProjectAction<SetScrollPositionAction>(ProjectActionType.SET_SCROLL_POSITION, { horizontal, vertical }, { trackable: false }),
+};
+
+// Marker Actions
+export const markerActions = {
+  addMarker: (marker: {
+    id: string;
+    position: number;
+    color: string;
+    icon: 'bookmark' | 'flag' | 'star' | 'record' | 'mic' | 'music' | 'zap' | 'comment';
+    label?: string;
+    projectId: string;
+    createdBy: string;
+    createdAt: number;
+  }, userId: string, userName: string) =>
+    createProjectAction<AddMarkerAction>(ProjectActionType.ADD_MARKER, { marker }, {
+      userId,
+      userName,
+      description: `Added marker "${marker.label || 'Marker'}" at beat ${marker.position}`,
+    }),
+
+  updateMarker: (markerId: string, changes: {
+    position?: number;
+    color?: string;
+    icon?: 'bookmark' | 'flag' | 'star' | 'record' | 'mic' | 'music' | 'zap' | 'comment';
+    label?: string;
+  }, markerName: string, userId: string, userName: string) =>
+    createProjectAction<UpdateMarkerAction>(ProjectActionType.UPDATE_MARKER, { markerId, changes }, {
+      userId,
+      userName,
+      description: `Updated marker "${markerName}"`,
+    }),
+
+  removeMarker: (markerId: string, markerName: string, userId: string, userName: string) =>
+    createProjectAction<RemoveMarkerAction>(ProjectActionType.REMOVE_MARKER, { markerId }, {
+      userId,
+      userName,
+      description: `Removed marker "${markerName}"`,
     }),
 };

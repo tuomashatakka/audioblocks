@@ -10,6 +10,7 @@ import WebSocketService from "@/utils/WebSocketService";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import ProjectView from "./pages/project/ProjectView";
+import ProjectListPage from "./pages/ProjectListPage";
 
 // Create a new QueryClient instance
 const queryClient = new QueryClient();
@@ -26,14 +27,14 @@ const App: React.FC = () => {
     // Initialize WebSocketService and make it accessible for debugging
     const webSocketService = WebSocketService.getInstance();
     window.getWebSocketService = () => webSocketService;
-    
+
     // Cleanup function
     return () => {
       webSocketService.cleanup();
       delete window.getWebSocketService;
     };
   }, []);
-  
+
   return (
     <React.StrictMode>
       <QueryClientProvider client={queryClient}>
@@ -42,8 +43,8 @@ const App: React.FC = () => {
             <BrowserRouter>
               <Routes>
                 <Route path="/" element={<Index />} />
+                <Route path="/projects" element={<ProjectListPage />} />
                 <Route path="/project/:projectId" element={<ProjectView />} />
-                {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                 <Route path="*" element={<NotFound />} />
               </Routes>
             </BrowserRouter>

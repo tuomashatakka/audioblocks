@@ -24,6 +24,18 @@ export interface Block {
   pitch: number;
   editingUserId?: string | null;
   fileId?: string | null;
+  file?: File;
+}
+
+export interface TimelineMarker {
+  id: string;
+  position: number; // beat position
+  color: string;
+  icon: 'bookmark' | 'flag' | 'star' | 'record' | 'mic' | 'music' | 'zap' | 'comment';
+  label?: string;
+  projectId: string;
+  createdBy: string;
+  createdAt: number;
 }
 
 export interface ProjectHistoryEntry {
@@ -66,6 +78,7 @@ export interface ProjectState {
   // Audio Data
   tracks: Track[];
   blocks: Block[];
+  markers: TimelineMarker[];
 
   // Playback State
   isPlaying: boolean;
@@ -119,6 +132,7 @@ export const initialProjectState: ProjectState = {
   },
   tracks: [],
   blocks: [],
+  markers: [],
   isPlaying: false,
   currentBeat: 0,
   selectedBlockId: null,
@@ -175,6 +189,7 @@ export function projectReducer(state: ProjectState, action: ProjectAction): Proj
         },
         tracks: action.payload.tracks,
         blocks: action.payload.blocks,
+        markers: action.payload.markers || [],
         loading: false,
         error: null
       };
@@ -426,6 +441,29 @@ export function projectReducer(state: ProjectState, action: ProjectAction): Proj
         )
       };
 
+    // Marker Actions
+    case ProjectActionType.ADD_MARKER:
+      return {
+        ...newState,
+        markers: [...state.markers, action.payload.marker]
+      };
+
+    case ProjectActionType.UPDATE_MARKER:
+      return {
+        ...newState,
+        markers: state.markers.map(marker =>
+          marker.id === action.payload.markerId
+            ? { ...marker, ...action.payload.changes }
+            : marker
+        )
+      };
+
+    case ProjectActionType.REMOVE_MARKER:
+      return {
+        ...newState,
+        markers: state.markers.filter(marker => marker.id !== action.payload.markerId)
+      };
+
     // UI Actions
     case ProjectActionType.SELECT_BLOCK:
       return {
@@ -477,7 +515,7 @@ export function projectReducer(state: ProjectState, action: ProjectAction): Proj
         userName: action.payload.userName,
         details: action.payload.details
       };
-      
+
       return {
         ...newState,
         history: [...state.history, historyEntry]
@@ -505,7 +543,7 @@ export function projectReducer(state: ProjectState, action: ProjectAction): Proj
       if (existingUser) {
         return newState; // User already exists
       }
-      
+
       return {
         ...newState,
         remoteUsers: [
@@ -537,11 +575,11 @@ export function projectReducer(state: ProjectState, action: ProjectAction): Proj
               }
             : user
         ),
-        localUserName: action.payload.userId === state.localUserId 
+        localUserName: action.payload.userId === state.localUserId
           ? (action.payload.userName || state.localUserName)
           : state.localUserName,
-        isConnected: action.payload.connected !== undefined 
-          ? action.payload.connected 
+        isConnected: action.payload.connected !== undefined
+          ? action.payload.connected
           : state.isConnected
       };
 
@@ -552,13 +590,13 @@ export function projectReducer(state: ProjectState, action: ProjectAction): Proj
 }
 
 // Helper function to generate consistent colors for users
-function generateUserColor(userId: string): string {
+export function generateUserColor(userId: string): string {
   // Simple hash function to convert userId to a number
   let hash = 0;
   for (let i = 0; i < userId.length; i++) {
     hash = userId.charCodeAt(i) + ((hash << 5) - hash);
   }
-  
+
   // Convert the hash to a color
   const hue = Math.abs(hash) % 360;
   return `hsl(${hue}, 70%, 65%)`;

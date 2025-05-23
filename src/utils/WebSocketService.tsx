@@ -1,14 +1,20 @@
 import { EventEmitter } from "./eventEmitter";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+
+import DisposableEvent from '@/utils/DisposableEvent'
+
 import {
   UserInteractionMessage,
   ActionType,
   DispatchProcessStatus,
-  FilePayload
+  FilePayload,
+  GeneralMessage
 } from "@/types/collaborative";
 import { throttle } from '@/lib/utils';
 import { RealtimeChannel, RealtimeMessage } from "@supabase/supabase-js";
+import DisposableCollection from "disposable-events/src/DisposableCollection";
+import { ToastAction } from "@/components/ui/toast";
 
 
 type RealtimeMessageParams = {}
@@ -48,11 +54,13 @@ class WebSocketService extends EventEmitter {
   private channel: RealtimeChannel; // RealtimeChannel type
   private generalChannel: RealtimeChannel; // Channel for general project messages
   private generalChannelReady: boolean = false; // Track if general channel is ready
-  private generalMessageQueue: RealtimeMessage[] = []; // Queue for messages when channel isn't ready
+  private generalMessageQueue: GeneralMessage[] = []; // Queue for messages when channel isn't ready
   private currentProjectId: string | null = null;
   private connectionCheckInterval: number | null = null;
   private reconnectTimeout: number | null = null;
   private lastPingTime: number = Date.now();
+
+  private subscriptions = new DisposableCollection()
 
   private constructor() {
     super();
@@ -116,6 +124,16 @@ class WebSocketService extends EventEmitter {
 
   public getLocalUserName(): string {
     return this.localUserName;
+  }
+
+  public setLocalUserData ({ userName, userId }: { userName: string; userId: string }): void  {
+    this.setLocalUserId(userId)
+    this.setLocalUserName(userName)
+  }
+
+  public setLocalUserId(id: string): void {
+    this.localUserId = id;
+    localStorage.setItem('userId', id);
   }
 
   public setLocalUserName(name: string): void {
@@ -244,11 +262,10 @@ class WebSocketService extends EventEmitter {
         this.lastPingTime = Date.now();
       })
       // Listen to cursor movement updates
-      .on('broadcast', { event: 'cursor_move' }, (payload) => {
+      .on('broadcast', { event: 'cursor_move' }, (payload: { payload: { x: number, y: number, userId: string }}) => {
         // Don't process our own cursor movements
-        if (payload.payload.userId === this.localUserId) {
+        if (payload.payload.userId === this.localUserId)
           return;
-        }
 
         this.emit('cursorMove', payload.payload);
         this.lastPingTime = Date.now();
@@ -310,17 +327,22 @@ class WebSocketService extends EventEmitter {
       });
 
     // Set up throttled cursor movement
-    document.addEventListener('mousemove', this.throttledCursorUpdate);
+    // document.addEventListener('mousemove', this.throttledCursorUpdate);
+    this.subscriptions.add(new DisposableEvent({ type: 'mousemove', handler: this.throttledCursorUpdate, target: document.body }));
+
   }
 
   public disconnectFromProject(): void {
     if (this.channel) {
-      document.removeEventListener('mousemove', this.throttledCursorUpdate);
       this.channel.unsubscribe();
       this.channel = null;
       this.currentProjectId = null;
     }
   }
+
+  // public updateCursorPosition (x: number, y: number) {
+
+  //   }
 
   private throttledCursorUpdate = throttle((e: MouseEvent) => {
     if (!this.channel || !this.connected || !this.currentProjectId) return;
@@ -367,7 +389,7 @@ class WebSocketService extends EventEmitter {
     }
   }, 150);
 
-  public sendMessage(action: ActionType, params: RealtimeMessagePayload, filePayload?: FilePayload): string {
+  public sendMessage(action: ActionType, params: unknown, filePayload?: FilePayload): string {
     const messageId = `msg-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
 
     if (!this.connected || !this.channel) {
@@ -376,6 +398,7 @@ class WebSocketService extends EventEmitter {
         title: "Connection Lost",
         description: "Your changes will be synchronized when the connection is restored.",
         variant: "destructive",
+        action: <ToastAction onClick={this.reconnect} altText={"Reconnect"}>Reconnect</ToastAction>
       });
       return messageId;
     }
@@ -444,7 +467,7 @@ class WebSocketService extends EventEmitter {
     return messageId;
   }
 
-  public sendGeneralMessage(message: Message): void {
+  public sendGeneralMessage(message: GeneralMessage): void {
     // Always fail silently for ping messages
     if (message.type === 'ping') {
       return;

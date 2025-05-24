@@ -1,37 +1,38 @@
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/integrations/supabase/client'
+
 
 export interface SampleProjectData {
-  name: string;
-  bpm: number;
+  name:         string;
+  bpm:          number;
   masterVolume: number;
-  settings: any;
+  settings:     any;
   tracks: {
-    name: string;
-    color: string;
+    name:   string;
+    color:  string;
     volume: number;
-    muted: boolean;
-    solo: boolean;
-    armed: boolean;
+    muted:  boolean;
+    solo:   boolean;
+    armed:  boolean;
   }[];
   blocks: {
-    name: string;
-    trackIndex: number;
-    startBeat: number;
+    name:        string;
+    trackIndex:  number;
+    startBeat:   number;
     lengthBeats: number;
-    volume: number;
-    pitch: number;
+    volume:      number;
+    pitch:       number;
   }[];
 }
 
 const defaultSampleProject: SampleProjectData = {
-  name: "Sample Project",
-  bpm: 120,
+  name:         'Sample Project',
+  bpm:          120,
   masterVolume: 80,
-  settings: {
-    theme: 'dark',
-    snapToGrid: true,
-    gridSize: 1,
-    autoSave: true,
+  settings:     {
+    theme:             'dark',
+    snapToGrid:        true,
+    gridSize:          1,
+    autoSave:          true,
     showCollaborators: true
   },
   tracks: [
@@ -47,96 +48,100 @@ const defaultSampleProject: SampleProjectData = {
     { name: 'Synth Lead', trackIndex: 2, startBeat: 12, lengthBeats: 6, volume: 65, pitch: 0 },
     { name: 'Vocal Chop', trackIndex: 3, startBeat: 16, lengthBeats: 8, volume: 85, pitch: 2 },
   ]
-};
+}
 
-export async function createSampleProject(projectData: SampleProjectData = defaultSampleProject): Promise<string> {
+export async function createSampleProject (projectData: SampleProjectData = defaultSampleProject): Promise<string> {
   try {
     // Create the project
     const { data: project, error: projectError } = await supabase
       .from('projects')
       .insert({
-        name: projectData.name,
-        bpm: projectData.bpm,
+        name:          projectData.name,
+        bpm:           projectData.bpm,
         master_volume: projectData.masterVolume,
-        settings: projectData.settings
+        settings:      projectData.settings
       })
       .select()
-      .single();
+      .single()
 
-    if (projectError) throw projectError;
+    if (projectError)
+      throw projectError
 
     // Create tracks
     const trackInserts = projectData.tracks.map(track => ({
       project_id: project.id,
-      name: track.name,
-      color: track.color,
-      volume: track.volume,
-      muted: track.muted,
-      solo: track.solo,
-      armed: track.armed
-    }));
+      name:       track.name,
+      color:      track.color,
+      volume:     track.volume,
+      muted:      track.muted,
+      solo:       track.solo,
+      armed:      track.armed
+    }))
 
     const { data: tracks, error: tracksError } = await supabase
       .from('tracks')
       .insert(trackInserts)
-      .select();
+      .select()
 
-    if (tracksError) throw tracksError;
+    if (tracksError)
+      throw tracksError
 
     // Create audio blocks
     const blockInserts = projectData.blocks.map(block => ({
-      track_id: tracks[block.trackIndex].id,
-      name: block.name,
-      start_beat: block.startBeat,
+      track_id:     tracks[block.trackIndex].id,
+      name:         block.name,
+      start_beat:   block.startBeat,
       length_beats: block.lengthBeats,
-      volume: block.volume,
-      pitch: block.pitch
-    }));
+      volume:       block.volume,
+      pitch:        block.pitch
+    }))
 
     const { data: blocks, error: blocksError } = await supabase
       .from('audio_blocks')
       .insert(blockInserts)
-      .select();
+      .select()
 
-    if (blocksError) throw blocksError;
+    if (blocksError)
+      throw blocksError
 
     console.log('Sample project created successfully!', {
       project: project.id,
-      tracks: tracks.length,
-      blocks: blocks.length
-    });
+      tracks:  tracks.length,
+      blocks:  blocks.length
+    })
 
-    return project.id;
-  } catch (error) {
-    console.error('Error creating sample project:', error);
-    throw error;
+    return project.id
+  }
+  catch (error) {
+    console.error('Error creating sample project:', error)
+    throw error
   }
 }
 
-export async function createCustomSampleProject(
+export async function createCustomSampleProject (
   name: string,
   customTracks?: string[],
   customSettings?: any
 ): Promise<string> {
   const tracks = customTracks?.map((trackName, index) => {
-    const colors = ['#FF466A', '#FFB446', '#64C850', '#5096FF', '#9B59B6', '#E67E22'];
+    const colors = [ '#FF466A', '#FFB446', '#64C850', '#5096FF', '#9B59B6', '#E67E22' ]
     return {
-      name: trackName,
-      color: colors[index % colors.length],
+      name:   trackName,
+      color:  colors[index % colors.length],
       volume: 75,
-      muted: false,
-      solo: false,
-      armed: false
-    };
-  }) || defaultSampleProject.tracks;
+      muted:  false,
+      solo:   false,
+      armed:  false
+    }
+  }) || defaultSampleProject.tracks
 
   const customProject: SampleProjectData = {
     ...defaultSampleProject,
     name,
     tracks,
     settings: { ...defaultSampleProject.settings, ...customSettings },
-    blocks: [] // Start with no blocks for custom projects
-  };
+    blocks:   [] // Start with no blocks for custom projects
+  }
 
-  return createSampleProject(customProject);
+  return createSampleProject(customProject)
 }

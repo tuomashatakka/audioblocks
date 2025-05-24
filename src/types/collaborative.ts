@@ -1,4 +1,3 @@
-
 export enum ActionType {
   // Play controls
   PLAY = 'PLAY',
@@ -58,57 +57,57 @@ export enum ActionType {
 }
 
 export interface Message {
-  userId?: string;
-  userName?: string;
+  userId?:    string;
+  userName?:  string;
   actionType: ActionType;
   timestamp?: number;
-  data: any;
+  data:       any;
 }
 
 export interface GeneralMessage {
-  userId?: string;
-  userName?: string;
-  type: string;
-  message: string;
+  userId?:    string;
+  userName?:  string;
+  type:       string;
+  message:    string;
   timestamp?: number;
-  data?: any;
+  data?:      any;
 }
 
 export interface UserState {
-  id: string;
-  name: string;
-  color: string;
+  id:       string;
+  name:     string;
+  color:    string;
   position: { x: number; y: number };
   isActive: boolean;
   lastSeen: number;
 }
 
 export interface ProjectState {
-  users: Record<string, UserState>;
-  localUserId: string;
-  localUserName: string;
+  users:           Record<string, UserState>;
+  localUserId:     string;
+  localUserName:   string;
   historyMessages: Message[];
 }
 
 export interface UserInteractionMessage {
-  userId: string;
-  userName?: string;
-  action: ActionType;
-  params: any;
-  timestamp: number;
-  state?: DispatchProcessStatus;
-  messageId: string;
+  userId:       string;
+  userName?:    string;
+  action:       ActionType;
+  params:       any;
+  timestamp:    number;
+  state?:       DispatchProcessStatus;
+  messageId:    string;
   filePayload?: FilePayload;
 }
 
 export interface ProjectHistoryEntry {
-  userId: string;
-  userName?: string;
+  userId:     string;
+  userName?:  string;
   userColor?: string;
-  action: ActionType;
-  params: any;
-  timestamp: number;
-  messageId: string;
+  action:     ActionType;
+  params:     any;
+  timestamp:  number;
+  messageId:  string;
 }
 
 export enum DispatchProcessStatus {
@@ -120,13 +119,13 @@ export enum DispatchProcessStatus {
 }
 
 export interface FilePayload {
-  id: string;
-  name: string;
-  type: string;
-  size: number;
-  data?: ArrayBuffer | string;
-  isChunk?: boolean;
-  chunkIndex?: number;
+  id:           string;
+  name:         string;
+  type:         string;
+  size:         number;
+  data?:        ArrayBuffer | string;
+  isChunk?:     boolean;
+  chunkIndex?:  number;
   totalChunks?: number;
-  transferId?: string;
+  transferId?:  string;
 }

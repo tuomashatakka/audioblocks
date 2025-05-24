@@ -1,15 +1,16 @@
 import Disposable from 'disposable-events/src/Disposable'
 import { EventEmitter } from './eventEmitter'
 
+
 const missingArgumentError = (pre: string, name: string) => `${pre} the listened event must be provided for the DisposableEvent by passing a \`${name}\` property upon calling its constructor`
-const missingTypeError = missingArgumentError("The type of", "type")
-const missingHandlerError = missingArgumentError("The handler for", "handler")
+const missingTypeError = missingArgumentError('The type of', 'type')
+const missingHandlerError = missingArgumentError('The handler for', 'handler')
 
 
 export default class DisposableEvent extends Disposable {
   handler: EventListener | null
-  target: HTMLElement | null
-  type: string = ''
+  target:  HTMLElement | null
+  type:    string = ''
 
   /**
    * Initiate a new disposable.
@@ -24,15 +25,14 @@ export default class DisposableEvent extends Disposable {
    */
 
   constructor ({ type, handler, target }: { type: string, handler: EventListener, target: HTMLElement }) {
-
     const bind = () =>
-      !this.disposed ?
-      this.target && typeof this.target.addEventListener === 'function' && this.target.addEventListener(this.type, this.handler as EventListener) :
-      null
+      !this.disposed
+        ? this.target && typeof this.target.addEventListener === 'function' && this.target.addEventListener(this.type, this.handler as EventListener)
+        : null
 
     const unbind = () => {
-      if (!this.target || (typeof this.target.removeEventListener !== 'function'))
-       return
+      if (!this.target || typeof this.target.removeEventListener !== 'function')
+        return
       this.target.removeEventListener(this.type, this.handler as EventListener)
       this.target = null
       this.handler = null
@@ -49,14 +49,12 @@ export default class DisposableEvent extends Disposable {
 
     super(unbind)
 
-    this.type    = type || 'click'
-    this.target  = destination
+    this.type = type || 'click'
+    this.target = destination
     this.handler = (e: Event) => handler.call(target, e)
 
     bind()
-
   }
-
 }
 
 function getDefaultTarget () {

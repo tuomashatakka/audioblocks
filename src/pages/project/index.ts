@@ -1,1 +1,1 @@
-export { default } from './ProjectView';
+export { default } from './ProjectView'

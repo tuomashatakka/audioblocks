@@ -1,5 +1,5 @@
-import { ActionType } from '@/types/collaborative';
-import { Block, ProjectSettings, Track } from './projectReducer';
+import { ActionType } from '@/types/collaborative'
+import { Block, ProjectSettings, Track } from './projectReducer'
 
 // Project Action Types
 export enum ProjectActionType {
@@ -71,43 +71,43 @@ export enum ProjectActionType {
 
 // Action Interfaces
 export interface ProjectAction {
-  type: ProjectActionType;
+  type:     ProjectActionType;
   payload?: any;
   meta?: {
-    timestamp: number;
-    userId: string;
-    userName: string;
+    timestamp:   number;
+    userId:      string;
+    userName:    string;
     description: string;
-    trackable?: boolean; // Whether this action should appear in history
+    trackable?:  boolean; // Whether this action should appear in history
   };
 }
 
 // Project Management Actions
 export interface LoadProjectAction extends ProjectAction {
-  type: ProjectActionType.LOAD_PROJECT;
+  type:    ProjectActionType.LOAD_PROJECT;
   payload: {
-    id: string;
-    name: string;
-    bpm: number;
+    id:           string;
+    name:         string;
+    bpm:          number;
     masterVolume: number;
-    settings: ProjectSettings;
-    tracks: Track[];
-    blocks: Block[];
+    settings:     ProjectSettings;
+    tracks:       Track[];
+    blocks:       Block[];
   };
 }
 
 export interface SetProjectLoadingAction extends ProjectAction {
-  type: ProjectActionType.SET_PROJECT_LOADING;
+  type:    ProjectActionType.SET_PROJECT_LOADING;
   payload: { loading: boolean };
 }
 
 export interface SetProjectErrorAction extends ProjectAction {
-  type: ProjectActionType.SET_PROJECT_ERROR;
+  type:    ProjectActionType.SET_PROJECT_ERROR;
   payload: { error: string | null };
 }
 
 export interface UpdateProjectSettingsAction extends ProjectAction {
-  type: ProjectActionType.UPDATE_PROJECT_SETTINGS;
+  type:    ProjectActionType.UPDATE_PROJECT_SETTINGS;
   payload: { settings: ProjectSettings };
 }
 
@@ -125,183 +125,183 @@ export interface RestartAction extends ProjectAction {
 }
 
 export interface SetCurrentBeatAction extends ProjectAction {
-  type: ProjectActionType.SET_CURRENT_BEAT;
+  type:    ProjectActionType.SET_CURRENT_BEAT;
   payload: { beat: number };
 }
 
 export interface SetBpmAction extends ProjectAction {
-  type: ProjectActionType.SET_BPM;
+  type:    ProjectActionType.SET_BPM;
   payload: { bpm: number };
 }
 
 export interface SetMasterVolumeAction extends ProjectAction {
-  type: ProjectActionType.SET_MASTER_VOLUME;
+  type:    ProjectActionType.SET_MASTER_VOLUME;
   payload: { volume: number };
 }
 
 // Track Actions
 export interface AddTrackAction extends ProjectAction {
-  type: ProjectActionType.ADD_TRACK;
+  type:    ProjectActionType.ADD_TRACK;
   payload: {
     track: {
-      id: string;
-      name: string;
-      color: string;
+      id:     string;
+      name:   string;
+      color:  string;
       volume: number;
-      muted: boolean;
-      solo: boolean;
-      armed: boolean;
+      muted:  boolean;
+      solo:   boolean;
+      armed:  boolean;
     };
   };
 }
 
 export interface RemoveTrackAction extends ProjectAction {
-  type: ProjectActionType.REMOVE_TRACK;
+  type:    ProjectActionType.REMOVE_TRACK;
   payload: { trackId: string };
 }
 
 export interface UpdateTrackAction extends ProjectAction {
-  type: ProjectActionType.UPDATE_TRACK;
+  type:    ProjectActionType.UPDATE_TRACK;
   payload: {
     trackId: string;
     updates: Partial<{
-      name: string;
-      color: string;
-      volume: number;
-      muted: boolean;
-      solo: boolean;
-      armed: boolean;
-      locked: boolean;
+      name:         string;
+      color:        string;
+      volume:       number;
+      muted:        boolean;
+      solo:         boolean;
+      armed:        boolean;
+      locked:       boolean;
       lockedByUser: string | null;
     }>;
   };
 }
 
 export interface RenameTrackAction extends ProjectAction {
-  type: ProjectActionType.RENAME_TRACK;
+  type:    ProjectActionType.RENAME_TRACK;
   payload: { trackId: string; name: string };
 }
 
 export interface SetTrackVolumeAction extends ProjectAction {
-  type: ProjectActionType.SET_TRACK_VOLUME;
+  type:    ProjectActionType.SET_TRACK_VOLUME;
   payload: { trackId: string; volume: number };
 }
 
 export interface MuteTrackAction extends ProjectAction {
-  type: ProjectActionType.MUTE_TRACK;
+  type:    ProjectActionType.MUTE_TRACK;
   payload: { trackId: string; muted: boolean };
 }
 
 export interface SoloTrackAction extends ProjectAction {
-  type: ProjectActionType.SOLO_TRACK;
+  type:    ProjectActionType.SOLO_TRACK;
   payload: { trackId: string; solo: boolean };
 }
 
 export interface ArmTrackAction extends ProjectAction {
-  type: ProjectActionType.ARM_TRACK;
+  type:    ProjectActionType.ARM_TRACK;
   payload: { trackId: string; armed: boolean };
 }
 
 export interface LockTrackAction extends ProjectAction {
-  type: ProjectActionType.LOCK_TRACK;
+  type:    ProjectActionType.LOCK_TRACK;
   payload: { trackId: string; userId: string; userName: string };
 }
 
 export interface UnlockTrackAction extends ProjectAction {
-  type: ProjectActionType.UNLOCK_TRACK;
+  type:    ProjectActionType.UNLOCK_TRACK;
   payload: { trackId: string };
 }
 
 // Block Actions
 export interface AddBlockAction extends ProjectAction {
-  type: ProjectActionType.ADD_BLOCK;
+  type:    ProjectActionType.ADD_BLOCK;
   payload: {
     block: {
-      id: string;
-      name: string;
-      track: number;
-      startBeat: number;
+      id:          string;
+      name:        string;
+      track:       number;
+      startBeat:   number;
       lengthBeats: number;
-      volume: number;
-      pitch: number;
-      fileId?: string;
+      volume:      number;
+      pitch:       number;
+      fileId?:     string;
     };
   };
 }
 
 export interface RemoveBlockAction extends ProjectAction {
-  type: ProjectActionType.REMOVE_BLOCK;
+  type:    ProjectActionType.REMOVE_BLOCK;
   payload: { blockId: string };
 }
 
 export interface UpdateBlockAction extends ProjectAction {
-  type: ProjectActionType.UPDATE_BLOCK;
+  type:    ProjectActionType.UPDATE_BLOCK;
   payload: {
     blockId: string;
     updates: Partial<{
-      name: string;
-      volume: number;
-      pitch: number;
-      startBeat: number;
+      name:        string;
+      volume:      number;
+      pitch:       number;
+      startBeat:   number;
       lengthBeats: number;
-      track: number;
+      track:       number;
     }>;
   };
 }
 
 export interface MoveBlockAction extends ProjectAction {
-  type: ProjectActionType.MOVE_BLOCK;
+  type:    ProjectActionType.MOVE_BLOCK;
   payload: {
-    blockId: string;
-    track: number;
+    blockId:   string;
+    track:     number;
     startBeat: number;
   };
 }
 
 export interface ResizeBlockAction extends ProjectAction {
-  type: ProjectActionType.RESIZE_BLOCK;
+  type:    ProjectActionType.RESIZE_BLOCK;
   payload: {
-    blockId: string;
+    blockId:     string;
     lengthBeats: number;
   };
 }
 
 export interface DuplicateBlockAction extends ProjectAction {
-  type: ProjectActionType.DUPLICATE_BLOCK;
+  type:    ProjectActionType.DUPLICATE_BLOCK;
   payload: {
     originalBlockId: string;
     newBlock: {
-      id: string;
-      name: string;
-      track: number;
-      startBeat: number;
+      id:          string;
+      name:        string;
+      track:       number;
+      startBeat:   number;
       lengthBeats: number;
-      volume: number;
-      pitch: number;
+      volume:      number;
+      pitch:       number;
     };
   };
 }
 
 export interface StartEditingBlockAction extends ProjectAction {
-  type: ProjectActionType.START_EDITING_BLOCK;
+  type:    ProjectActionType.START_EDITING_BLOCK;
   payload: { blockId: string; userId: string };
 }
 
 export interface EndEditingBlockAction extends ProjectAction {
-  type: ProjectActionType.END_EDITING_BLOCK;
+  type:    ProjectActionType.END_EDITING_BLOCK;
   payload: { blockId: string };
 }
 
 // Marker Actions
 export interface AddMarkerAction extends ProjectAction {
-  type: ProjectActionType.ADD_MARKER;
+  type:    ProjectActionType.ADD_MARKER;
   payload: {
     marker: {
-      id: string;
-      position: number;
-      color: string;
-      icon: 'bookmark' | 'flag' | 'star' | 'record' | 'mic' | 'music' | 'zap' | 'comment';
-      label?: string;
+      id:        string;
+      position:  number;
+      color:     string;
+      icon:      'bookmark' | 'flag' | 'star' | 'record' | 'mic' | 'music' | 'zap' | 'comment';
+      label?:    string;
       projectId: string;
       createdBy: string;
       createdAt: number;
@@ -310,20 +310,20 @@ export interface AddMarkerAction extends ProjectAction {
 }
 
 export interface UpdateMarkerAction extends ProjectAction {
-  type: ProjectActionType.UPDATE_MARKER;
+  type:    ProjectActionType.UPDATE_MARKER;
   payload: {
     markerId: string;
     changes: {
       position?: number;
-      color?: string;
-      icon?: 'bookmark' | 'flag' | 'star' | 'record' | 'mic' | 'music' | 'zap' | 'comment';
-      label?: string;
+      color?:    string;
+      icon?:     'bookmark' | 'flag' | 'star' | 'record' | 'mic' | 'music' | 'zap' | 'comment';
+      label?:    string;
     };
   };
 }
 
 export interface RemoveMarkerAction extends ProjectAction {
-  type: ProjectActionType.REMOVE_MARKER;
+  type:    ProjectActionType.REMOVE_MARKER;
   payload: {
     markerId: string;
   };
@@ -331,7 +331,7 @@ export interface RemoveMarkerAction extends ProjectAction {
 
 // UI Actions
 export interface SelectBlockAction extends ProjectAction {
-  type: ProjectActionType.SELECT_BLOCK;
+  type:    ProjectActionType.SELECT_BLOCK;
   payload: { blockId: string };
 }
 
@@ -340,63 +340,63 @@ export interface DeselectBlockAction extends ProjectAction {
 }
 
 export interface SetActiveToolAction extends ProjectAction {
-  type: ProjectActionType.SET_ACTIVE_TOOL;
+  type:    ProjectActionType.SET_ACTIVE_TOOL;
   payload: { tool: string };
 }
 
 export interface SetZoomAction extends ProjectAction {
-  type: ProjectActionType.SET_ZOOM;
+  type:    ProjectActionType.SET_ZOOM;
   payload: { pixelsPerBeat: number };
 }
 
 export interface SetScrollPositionAction extends ProjectAction {
-  type: ProjectActionType.SET_SCROLL_POSITION;
+  type:    ProjectActionType.SET_SCROLL_POSITION;
   payload: { horizontal: number; vertical: number };
 }
 
 export interface ToggleSettingsAction extends ProjectAction {
-  type: ProjectActionType.TOGGLE_SETTINGS;
+  type:    ProjectActionType.TOGGLE_SETTINGS;
   payload: { open: boolean };
 }
 
 export interface ToggleHistoryDrawerAction extends ProjectAction {
-  type: ProjectActionType.TOGGLE_HISTORY_DRAWER;
+  type:    ProjectActionType.TOGGLE_HISTORY_DRAWER;
   payload: { open: boolean };
 
 }
 
 // History Actions
 export interface AddHistoryEntryAction extends ProjectAction {
-  type: ProjectActionType.ADD_HISTORY_ENTRY;
+  type:    ProjectActionType.ADD_HISTORY_ENTRY;
   payload: {
-    id: string;
-    timestamp: number;
-    action: string;
+    id:          string;
+    timestamp:   number;
+    action:      string;
     description: string;
-    userId: string;
-    userName: string;
-    details?: any;
+    userId:      string;
+    userName:    string;
+    details?:    any;
   };
 }
 
 export interface UploadAudioFileAction extends ProjectAction {
-  type: ProjectActionType.UPLOAD_AUDIO_FILE;
+  type:    ProjectActionType.UPLOAD_AUDIO_FILE;
   payload: {
     blockId: string;
-    fileId: string;
+    fileId:  string;
   };
 }
 
 export interface DeleteAudioFileAction extends ProjectAction {
-  type: ProjectActionType.DELETE_AUDIO_FILE;
+  type:    ProjectActionType.DELETE_AUDIO_FILE;
   payload: {
     blockId: string;
-    fileId: string;
+    fileId:  string;
   };
 }
 
 export interface RestoreToTimestampAction extends ProjectAction {
-  type: ProjectActionType.RESTORE_TO_TIMESTAMP;
+  type:    ProjectActionType.RESTORE_TO_TIMESTAMP;
   payload: { timestamp: number };
 }
 
@@ -410,17 +410,17 @@ export const createProjectAction = <T extends ProjectAction>(
     type,
     payload,
     meta: {
-      timestamp: Date.now(),
-      userId: '',
-      userName: '',
+      timestamp:   Date.now(),
+      userId:      '',
+      userName:    '',
       description: '',
-      trackable: true,
+      trackable:   true,
       ...meta,
     },
-  } as T;
+  } as T
 
-  return action;
-};
+  return action
+}
 
 // Specific Action Creators with descriptions
 export const playbackActions = {
@@ -458,7 +458,7 @@ export const playbackActions = {
       userName,
       description: `Changed master volume to ${volume}%`,
     }),
-};
+}
 
 export const trackActions = {
   addTrack: (track: any, userId: string, userName: string) =>
@@ -523,7 +523,7 @@ export const trackActions = {
       userName,
       description: `Unlocked track "${trackName}"`,
     }),
-};
+}
 
 export const blockActions = {
   addBlock: (block: any, trackName: string, userId: string, userName: string) =>
@@ -596,32 +596,36 @@ export const blockActions = {
 
   setScrollPosition: (horizontal: number, vertical: number) =>
     createProjectAction<SetScrollPositionAction>(ProjectActionType.SET_SCROLL_POSITION, { horizontal, vertical }, { trackable: false }),
-};
+}
 
 // Marker Actions
+type MarkerType = {
+  id:        string;
+  position:  number;
+  color:     string;
+  icon:      'bookmark' | 'flag' | 'star' | 'record' | 'mic' | 'music' | 'zap' | 'comment';
+  label?:    string;
+  projectId: string;
+  createdBy: string;
+  createdAt: number;
+}
+
+type ChangesType = {
+  position?: number;
+  color?:    string;
+  icon?:     'bookmark' | 'flag' | 'star' | 'record' | 'mic' | 'music' | 'zap' | 'comment';
+  label?:    string;
+}
+
 export const markerActions = {
-  addMarker: (marker: {
-    id: string;
-    position: number;
-    color: string;
-    icon: 'bookmark' | 'flag' | 'star' | 'record' | 'mic' | 'music' | 'zap' | 'comment';
-    label?: string;
-    projectId: string;
-    createdBy: string;
-    createdAt: number;
-  }, userId: string, userName: string) =>
+  addMarker: (marker: MarkerType, userId: string, userName: string) =>
     createProjectAction<AddMarkerAction>(ProjectActionType.ADD_MARKER, { marker }, {
       userId,
       userName,
       description: `Added marker "${marker.label || 'Marker'}" at beat ${marker.position}`,
     }),
 
-  updateMarker: (markerId: string, changes: {
-    position?: number;
-    color?: string;
-    icon?: 'bookmark' | 'flag' | 'star' | 'record' | 'mic' | 'music' | 'zap' | 'comment';
-    label?: string;
-  }, markerName: string, userId: string, userName: string) =>
+  updateMarker: (markerId: string, changes: ChangesType, markerName: string, userId: string, userName: string) =>
     createProjectAction<UpdateMarkerAction>(ProjectActionType.UPDATE_MARKER, { markerId, changes }, {
       userId,
       userName,
@@ -634,4 +638,4 @@ export const markerActions = {
       userName,
       description: `Removed marker "${markerName}"`,
     }),
-};
+}

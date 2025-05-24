@@ -1,37 +1,37 @@
+import React, { forwardRef, useState } from 'react'
+import { Mic, Volume2, Lock, ChevronLeft, ChevronRight, Wrench } from 'lucide-react'
+import { Slider } from '@/components/ui/slider'
+import { Button } from '@/components/ui/button'
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
+import { Record } from './Record'
+import { cn } from '@/lib/utils'
 
-import React, { forwardRef, useState } from 'react';
-import { Mic, Volume2, Lock, ChevronLeft, ChevronRight, Wrench } from 'lucide-react';
-import { Slider } from "@/components/ui/slider";
-import { Button } from "@/components/ui/button";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { Record } from './Record';
-import { cn } from '@/lib/utils';
 
 export interface TrackInfo {
-  id: string;
-  name: string;
-  color: string;
-  volume: number;
-  muted: boolean;
-  solo: boolean;
-  armed?: boolean;
-  locked?: boolean;
-  lockedByUser?: string;
+  id:                string;
+  name:              string;
+  color:             string;
+  volume:            number;
+  muted:             boolean;
+  solo:              boolean;
+  armed?:            boolean;
+  locked?:           boolean;
+  lockedByUser?:     string;
   lockedByUserName?: string;
 }
 
 interface TrackListProps {
-  tracks: TrackInfo[];
-  onVolumeChange: (trackId: string, volume: number) => void;
-  onMuteToggle: (trackId: string) => void;
-  onSoloToggle: (trackId: string) => void;
-  onArmToggle?: (trackId: string) => void;
-  onLockToggle?: (trackId: string) => void;
-  onRename: (trackId: string, name: string) => void;
-  trackHeight: number;
-  scrollTop?: number;
+  tracks:             TrackInfo[];
+  onVolumeChange:     (trackId: string, volume: number) => void;
+  onMuteToggle:       (trackId: string) => void;
+  onSoloToggle:       (trackId: string) => void;
+  onArmToggle?:       (trackId: string) => void;
+  onLockToggle?:      (trackId: string) => void;
+  onRename:           (trackId: string, name: string) => void;
+  trackHeight:        number;
+  scrollTop?:         number;
   onTrackListScroll?: (scrollTop: number) => void;
-  localUserId: string;
+  localUserId:        string;
 }
 
 const TrackList = forwardRef<HTMLDivElement, TrackListProps>(({
@@ -47,144 +47,134 @@ const TrackList = forwardRef<HTMLDivElement, TrackListProps>(({
   onTrackListScroll,
   localUserId
 }, ref) => {
-  const [isCollapsed, setIsCollapsed] = useState(false);
-  
+  const [ isCollapsed, setIsCollapsed ] = useState(false)
+
   const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
-    if (onTrackListScroll) {
-      onTrackListScroll(e.currentTarget.scrollTop);
-    }
-  };
-  
-  return (
-    <div className={cn(
-      "w-48 min-w-48 border-r border-border bg-muted flex flex-col relative track-list",
-      isCollapsed && "collapsed"
-    )}>
-      <button 
-        className="track-list-toggle"
-        onClick={() => setIsCollapsed(!isCollapsed)}
-        title={isCollapsed ? "Expand track list" : "Collapse track list"}
-      >
-        {isCollapsed ? <ChevronRight size={12} /> : <ChevronLeft size={12} />}
-      </button>
-      
-      <div className="p-2 border-b border-border bg-secondary">
-        <h3 className="text-sm font-medium">Tracks</h3>
-      </div>
-      
-      <div 
-        ref={ref}
-        className="tracks-list flex-grow overflow-y-auto"
-        style={{ scrollTop: scrollTop || 0 } as React.CSSProperties}
-        onScroll={handleScroll}
-      >
-        {tracks.map((track, index) => {
-          const isLockedByCurrentUser = track.locked && track.lockedByUser === localUserId;
-          const isLockedByOtherUser = track.locked && track.lockedByUser !== localUserId;
-          
-          return (
-            <div 
-              key={track.id}
-              className={`track-item border-b border-border flex flex-col p-2 ${track.locked ? 'bg-muted/50' : ''}`}
-              style={{ height: `${trackHeight}px` }}
-            >
-              <div className="track-content">
-                <div className="flex items-center justify-between mb-1">
-                  <div 
-                    className="w-3 h-3 rounded-full mr-1 flex-shrink-0"
-                    style={{ backgroundColor: track.color }}
-                  />
-                  <span className="text-xs font-medium truncate flex-grow">{track.name}</span>
-                  <div className="flex items-center space-x-1">
-                    {isLockedByOtherUser && (
-                      <div className="text-red-500 mr-1" title={`Locked by ${track.lockedByUserName || 'another user'}`}>
-                        <Lock className="h-3 w-3" />
+    if (onTrackListScroll)
+      onTrackListScroll(e.currentTarget.scrollTop)
+  }
+
+  return <div
+    className={ cn(
+      'w-48 min-w-48 border-r border-border bg-muted flex flex-col relative track-list',
+      isCollapsed && 'collapsed'
+    ) }>
+    <button
+      className='track-list-toggle'
+      onClick={ () => setIsCollapsed(!isCollapsed) }
+      title={ isCollapsed ? 'Expand track list' : 'Collapse track list' }>
+      {isCollapsed ? <ChevronRight size={ 12 } /> : <ChevronLeft size={ 12 } />}
+    </button>
+
+    <div className='p-2 border-b border-border bg-secondary'>
+      <h3 className='text-sm font-medium'>Tracks</h3>
+    </div>
+
+    <div
+      ref={ ref }
+      className='tracks-list flex-grow overflow-y-auto'
+      style={{ scrollTop: scrollTop || 0 } as React.CSSProperties}
+      onScroll={ handleScroll }>
+      {tracks.map((track, index) => {
+        const isLockedByCurrentUser = track.locked && track.lockedByUser === localUserId
+        const isLockedByOtherUser = track.locked && track.lockedByUser !== localUserId
+
+        return <div
+          key={ track.id }
+          className={ `track-item border-b border-border flex flex-col p-2 ${track.locked ? 'bg-muted/50' : ''}` }
+          style={{ height: `${trackHeight}px` }}>
+          <div className='track-content'>
+            <div className='flex items-center justify-between mb-1'>
+              <div
+                className='w-3 h-3 rounded-full mr-1 flex-shrink-0'
+                style={{ backgroundColor: track.color }} />
+
+              <span className='text-xs font-medium truncate flex-grow'>{track.name}</span>
+
+              <div className='flex items-center space-x-1'>
+                {isLockedByOtherUser &&
+                      <div className='text-red-500 mr-1' title={ `Locked by ${track.lockedByUserName || 'another user'}` }>
+                        <Lock className='h-3 w-3' />
                       </div>
-                    )}
-                    {isLockedByCurrentUser && (
-                      <div className="text-green-500 mr-1" title="Locked by you">
-                        <Lock className="h-3 w-3" />
+                }
+
+                {isLockedByCurrentUser &&
+                      <div className='text-green-500 mr-1' title='Locked by you'>
+                        <Lock className='h-3 w-3' />
                       </div>
-                    )}
-                  </div>
-                </div>
-                
-                <div className="flex items-center justify-between mb-2">
-                  <ToggleGroup type="multiple" className="gap-0">
-                    <ToggleGroupItem 
-                      value="mute" 
-                      size="sm"
-                      className="h-6 w-6 p-0" 
-                      aria-label="Mute"
-                      disabled={isLockedByOtherUser}
-                      data-state={track.muted ? "on" : "off"}
-                      onClick={() => onMuteToggle(track.id)}
-                    >
-                      <Volume2 className="h-3 w-3" />
-                    </ToggleGroupItem>
-                    
-                    <ToggleGroupItem 
-                      value="solo" 
-                      size="sm"
-                      className="h-6 w-6 p-0" 
-                      aria-label="Solo"
-                      disabled={isLockedByOtherUser}
-                      data-state={track.solo ? "on" : "off"}
-                      onClick={() => onSoloToggle(track.id)}
-                    >
-                      <Mic className="h-3 w-3" />
-                    </ToggleGroupItem>
-                    
-                    {onArmToggle && (
-                      <ToggleGroupItem 
-                        value="arm" 
-                        size="sm"
-                        className="h-6 w-6 p-0" 
-                        aria-label="Record Arm"
-                        disabled={isLockedByOtherUser}
-                        data-state={track.armed ? "on" : "off"}
-                        onClick={() => onArmToggle(track.id)}
-                      >
-                        <Record className="h-3 w-3" />
-                      </ToggleGroupItem>
-                    )}
-                    
-                    {onLockToggle && (
-                      <ToggleGroupItem 
-                        value="lock" 
-                        size="sm"
-                        className="h-6 w-6 p-0" 
-                        aria-label={track.locked ? "Unlock Track" : "Lock Track"}
-                        disabled={isLockedByOtherUser}
-                        data-state={(track.locked && track.lockedByUser === localUserId) ? "on" : "off"}
-                        onClick={() => onLockToggle(track.id)}
-                      >
-                        <Wrench className="h-3 w-3" />
-                      </ToggleGroupItem>
-                    )}
-                  </ToggleGroup>
-                </div>
-                
-                <div className="flex items-center">
-                  <Slider
-                    className="w-full h-2"
-                    value={[track.volume]}
-                    min={0}
-                    max={100}
-                    step={1}
-                    onValueChange={([value]) => onVolumeChange(track.id, value)}
-                    disabled={isLockedByOtherUser}
-                  />
-                </div>
+                }
               </div>
             </div>
-          );
-        })}
-      </div>
+
+            <div className='flex items-center justify-between mb-2'>
+              <ToggleGroup type='multiple' className='gap-0'>
+                <ToggleGroupItem
+                  value='mute'
+                  size='sm'
+                  className='h-6 w-6 p-0'
+                  aria-label='Mute'
+                  disabled={ isLockedByOtherUser }
+                  data-state={ track.muted ? 'on' : 'off' }
+                  onClick={ () => onMuteToggle(track.id) }>
+                  <Volume2 className='h-3 w-3' />
+                </ToggleGroupItem>
+
+                <ToggleGroupItem
+                  value='solo'
+                  size='sm'
+                  className='h-6 w-6 p-0'
+                  aria-label='Solo'
+                  disabled={ isLockedByOtherUser }
+                  data-state={ track.solo ? 'on' : 'off' }
+                  onClick={ () => onSoloToggle(track.id) }>
+                  <Mic className='h-3 w-3' />
+                </ToggleGroupItem>
+
+                {onArmToggle &&
+                      <ToggleGroupItem
+                        value='arm'
+                        size='sm'
+                        className='h-6 w-6 p-0'
+                        aria-label='Record Arm'
+                        disabled={ isLockedByOtherUser }
+                        data-state={ track.armed ? 'on' : 'off' }
+                        onClick={ () => onArmToggle(track.id) }>
+                        <Record className='h-3 w-3' />
+                      </ToggleGroupItem>
+                }
+
+                {onLockToggle &&
+                      <ToggleGroupItem
+                        value='lock'
+                        size='sm'
+                        className='h-6 w-6 p-0'
+                        aria-label={ track.locked ? 'Unlock Track' : 'Lock Track' }
+                        disabled={ isLockedByOtherUser }
+                        data-state={ track.locked && track.lockedByUser === localUserId ? 'on' : 'off' }
+                        onClick={ () => onLockToggle(track.id) }>
+                        <Wrench className='h-3 w-3' />
+                      </ToggleGroupItem>
+                }
+              </ToggleGroup>
+            </div>
+
+            <div className='flex items-center'>
+              <Slider
+                className='w-full h-2'
+                value={ [ track.volume ] }
+                min={ 0 }
+                max={ 100 }
+                step={ 1 }
+                onValueChange={ ([ value ]) => onVolumeChange(track.id, value) }
+                disabled={ isLockedByOtherUser } />
+            </div>
+          </div>
+        </div>
+      })}
     </div>
-  );
-});
+  </div>
+})
 
-TrackList.displayName = 'TrackList';
+TrackList.displayName = 'TrackList'
 
-export default TrackList;
+export default TrackList

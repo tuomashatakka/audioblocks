@@ -12,7 +12,7 @@ import {
   ContextMenuSeparator,
   ContextMenuTrigger
 } from '@/components/ui/context-menu'
-import { Upload, Plus, Music } from 'lucide-react'
+import { Upload, Plus, Music, Send, Activity, Mic2 } from 'lucide-react'
 
 
 interface CompositionGridViewProps {
@@ -382,19 +382,81 @@ const CompositionGridView: React.FC<CompositionGridViewProps> = ({
         <ContextMenuContent className='w-48'>
           <ContextMenuItem onClick={ handleUploadClick }>
             <Upload className='mr-2 h-4 w-4' />
-            Upload Audio
+            Upload Audio File
           </ContextMenuItem>
 
           <ContextMenuSeparator />
 
           <ContextMenuItem onClick={ handleAddEmptyBlock }>
             <Plus className='mr-2 h-4 w-4' />
-            Add Empty Block
+            Add Audio Block
+          </ContextMenuItem>
+
+          <ContextMenuItem
+            onClick={ () => {
+              if (!contextMenuPosition || !onAddBlock)
+                return
+
+              const blockData = {
+                name:        `Recording ${Date.now()}`,
+                track:       contextMenuPosition.track,
+                startBeat:   contextMenuPosition.beat,
+                lengthBeats: beatsPerBar * 2, // 2 bars for recording
+                volume:      80,
+                pitch:       0
+              }
+              onAddBlock(blockData)
+              setContextMenuPosition(null)
+            } }>
+            <Mic2 className='mr-2 h-4 w-4' />
+            Add Recording Block
           </ContextMenuItem>
 
           <ContextMenuItem disabled>
             <Music className='mr-2 h-4 w-4' />
             Add MIDI Block
+          </ContextMenuItem>
+
+          <ContextMenuSeparator />
+
+          <ContextMenuItem
+            onClick={ () => {
+              if (!contextMenuPosition || !onAddBlock)
+                return
+
+              const blockData = {
+                name:        `Bus Send ${Date.now()}`,
+                track:       contextMenuPosition.track,
+                startBeat:   contextMenuPosition.beat,
+                lengthBeats: beatsPerBar,
+                volume:      80,
+                pitch:       0
+              }
+              onAddBlock(blockData)
+              setContextMenuPosition(null)
+            } }>
+            <Send className='mr-2 h-4 w-4' />
+            Add Bus Send
+          </ContextMenuItem>
+
+          <ContextMenuItem
+            onClick={ () => {
+              if (!contextMenuPosition || !onAddBlock)
+                return
+
+              const blockData = {
+                name:        `Effect Chain ${Date.now()}`,
+                track:       contextMenuPosition.track,
+                startBeat:   contextMenuPosition.beat,
+                lengthBeats: beatsPerBar,
+                volume:      80,
+                pitch:       0
+              }
+              onAddBlock(blockData)
+              setContextMenuPosition(null)
+            } }>
+            <Activity className='mr-2 h-4 w-4' />
+            Add Effect Chain
           </ContextMenuItem>
         </ContextMenuContent>
       </ContextMenu>

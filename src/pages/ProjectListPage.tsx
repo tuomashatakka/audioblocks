@@ -205,8 +205,7 @@ const ProjectListPage: React.FC = () => {
     }
   }
 
-  return
-  <div className='min-h-screen bg-background'>
+  return <div className='min-h-screen bg-background'>
     <div className='container mx-auto px-4 py-8'>
 
       <div className='flex flex-col gap-6 mb-8'>

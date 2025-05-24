@@ -17,7 +17,7 @@ import DisposableCollection from 'disposable-events/src/DisposableCollection'
 import { ToastAction } from '@/components/ui/toast'
 
 
-type RealtimeMessageParams = {}
+type RealtimeMessageParams = Record<string, unknown>
 
 type RealtimeMessagePayload = UserInteractionMessage & {
   params: RealtimeMessageParams

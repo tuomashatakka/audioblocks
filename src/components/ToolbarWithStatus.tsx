@@ -17,7 +17,7 @@ interface ToolbarWithStatusProps {
   onRestart:       () => void;
   onBpmChange:     (bpm: number) => void;
   onVolumeChange:  (volume: number) => void;
-  onAddTrack:      () => void;
+  onAddTrack:      (trackType?: 'audio' | 'bus') => void;
   usersCount:      number;
   activeTool:      ToolType;
   onChangeTool:    (tool: ToolType) => void;

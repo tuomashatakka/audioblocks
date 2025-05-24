@@ -93,7 +93,7 @@ const UIContextProvider = ({ children }: UIContextProviderProps) => {
     stopDragging,
   }), [])
 
-  const onContextMenu = (e) => {
+  const onContextMenu = e => {
     e.preventDefault()
 
     const x = e.clientX

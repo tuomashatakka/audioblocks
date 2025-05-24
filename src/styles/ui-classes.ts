@@ -63,5 +63,21 @@ export const ui = {
     beat:        'absolute h-full w-px bg-muted/30',
     bar:         'absolute h-full w-px bg-muted/50',
     playhead:    'absolute h-full w-px bg-primary/80 z-50 shadow-glow-sm',
+  },
+  masterTrack: {
+    container:     'master-track border-t-2 border-border bg-gradient-to-r from-slate-900 to-slate-800 flex items-center relative',
+    controls:      'master-controls flex items-center space-x-3 px-4 min-w-[200px] border-r border-border bg-slate-900/80',
+    waveform:      'master-waveform flex-1 relative overflow-hidden',
+    levelMeter:    'level-meter flex items-center space-x-1 min-w-[60px]',
+    levelBar:      'w-1 h-4 rounded-sm transition-all duration-75',
+    label:         'text-sm font-bold text-green-400',
+    badge:         'text-xs bg-green-500/20 border-green-500/30 text-green-400',
+    liveIndicator: 'w-2 h-2 bg-green-500 rounded-full animate-pulse'
+  },
+  busTrack: {
+    container:     'bg-orange-950/20 border-orange-500/20',
+    icon:          'h-3 w-3 text-orange-400',
+    badge:         'text-xs bg-orange-500/20 border-orange-500/30 text-orange-400',
+    sendIndicator: 'h-3 w-3 text-orange-400'
   }
 }

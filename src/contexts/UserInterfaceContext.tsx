@@ -23,7 +23,7 @@ const UIProvider = ({ children }) => {
     setContextMenu({ visible: false, x: 0, y: 0, items: []})
   }
 
-  const onContextMenu = (e) => {
+  const onContextMenu = e => {
     displayContextMenu(e.clientX, e.clientY, [])
   }
 
@@ -51,8 +51,7 @@ const UIProvider = ({ children }) => {
     }
   }
 
-  return
-  <UIContext.Provider
+  return <UIContext.Provider
     value={{
       contextMenu,
       displayContextMenu,

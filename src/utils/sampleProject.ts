@@ -7,12 +7,15 @@ export interface SampleProjectData {
   masterVolume: number;
   settings:     any;
   tracks: {
-    name:   string;
-    color:  string;
-    volume: number;
-    muted:  boolean;
-    solo:   boolean;
-    armed:  boolean;
+    name:      string;
+    type:      'audio' | 'bus' | 'master';
+    color:     string;
+    volume:    number;
+    muted:     boolean;
+    solo:      boolean;
+    armed:     boolean;
+    receives?: string[];
+    sends?:    { trackId: string; amount: number }[];
   }[];
   blocks: {
     name:        string;
@@ -36,10 +39,12 @@ const defaultSampleProject: SampleProjectData = {
     showCollaborators: true
   },
   tracks: [
-    { name: 'Drums', color: '#FF466A', volume: 80, muted: false, solo: false, armed: false },
-    { name: 'Bass', color: '#FFB446', volume: 75, muted: false, solo: false, armed: false },
-    { name: 'Synth', color: '#64C850', volume: 70, muted: false, solo: false, armed: false },
-    { name: 'Vocals', color: '#5096FF', volume: 85, muted: false, solo: false, armed: false },
+    { name: 'Drums', type: 'audio', color: '#FF466A', volume: 80, muted: false, solo: false, armed: false, sends: []},
+    { name: 'Bass', type: 'audio', color: '#FFB446', volume: 75, muted: false, solo: false, armed: false, sends: []},
+    { name: 'Synth', type: 'audio', color: '#64C850', volume: 70, muted: false, solo: false, armed: false, sends: []},
+    { name: 'Vocals', type: 'audio', color: '#5096FF', volume: 85, muted: false, solo: false, armed: false, sends: []},
+    { name: 'Reverb Bus', type: 'bus', color: '#fb7185', volume: 60, muted: false, solo: false, armed: false, receives: []},
+    { name: 'Master', type: 'master', color: '#22c55e', volume: 80, muted: false, solo: false, armed: false },
   ],
   blocks: [
     { name: 'Kick Pattern', trackIndex: 0, startBeat: 0, lengthBeats: 4, volume: 80, pitch: 0 },
@@ -71,11 +76,14 @@ export async function createSampleProject (projectData: SampleProjectData = defa
     const trackInserts = projectData.tracks.map(track => ({
       project_id: project.id,
       name:       track.name,
+      track_type: track.type,
       color:      track.color,
       volume:     track.volume,
       muted:      track.muted,
       solo:       track.solo,
-      armed:      track.armed
+      armed:      track.armed,
+      receives:   track.receives || [],
+      sends:      track.sends || []
     }))
 
     const { data: tracks, error: tracksError } = await supabase
@@ -127,13 +135,26 @@ export async function createCustomSampleProject (
     const colors = [ '#FF466A', '#FFB446', '#64C850', '#5096FF', '#9B59B6', '#E67E22' ]
     return {
       name:   trackName,
+      type:   'audio' as const,
       color:  colors[index % colors.length],
       volume: 75,
       muted:  false,
       solo:   false,
-      armed:  false
+      armed:  false,
+      sends:  []
     }
-  }) || defaultSampleProject.tracks
+  }) || defaultSampleProject.tracks.filter(track => track.type !== 'master')
+
+  // Always add a master track
+  tracks.push({
+    name:   'Master',
+    type:   'master',
+    color:  '#22c55e',
+    volume: 80,
+    muted:  false,
+    solo:   false,
+    armed:  false
+  })
 
   const customProject: SampleProjectData = {
     ...defaultSampleProject,

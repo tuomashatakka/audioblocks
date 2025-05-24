@@ -144,13 +144,16 @@ export interface AddTrackAction extends ProjectAction {
   type:    ProjectActionType.ADD_TRACK;
   payload: {
     track: {
-      id:     string;
-      name:   string;
-      color:  string;
-      volume: number;
-      muted:  boolean;
-      solo:   boolean;
-      armed:  boolean;
+      id:        string;
+      name:      string;
+      type:      'audio' | 'bus' | 'master';
+      color:     string;
+      volume:    number;
+      muted:     boolean;
+      solo:      boolean;
+      armed:     boolean;
+      receives?: string[];
+      sends?:    { trackId: string; amount: number }[];
     };
   };
 }
@@ -166,6 +169,7 @@ export interface UpdateTrackAction extends ProjectAction {
     trackId: string;
     updates: Partial<{
       name:         string;
+      type:         'audio' | 'bus' | 'master';
       color:        string;
       volume:       number;
       muted:        boolean;
@@ -173,6 +177,8 @@ export interface UpdateTrackAction extends ProjectAction {
       armed:        boolean;
       locked:       boolean;
       lockedByUser: string | null;
+      receives:     string[];
+      sends:        { trackId: string; amount: number }[];
     }>;
   };
 }

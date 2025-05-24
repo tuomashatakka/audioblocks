@@ -71,8 +71,7 @@ const ToolsMenu: React.FC<ToolsMenuProps> = ({
     return () => {
       window.removeEventListener('keydown', handleKeyDown)
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [ onChangeTool, onZoomIn, onZoomOut ])
 
   return <div className='flex items-center space-x-1 bg-secondary/50 p-1 rounded-md'>
     {tools.map(tool =>

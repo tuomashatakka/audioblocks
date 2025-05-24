@@ -1,10 +1,17 @@
 import React from 'react'
 import { Slider } from '@/components/ui/slider'
 import { Button } from '@/components/ui/button'
-import { Circle, Mic, Move3D, Pause, Play, Redo, SquarePen, Volume2, ZoomIn, ZoomOut } from 'lucide-react'
+import { Circle, Mic, Move3D, Pause, Play, Redo, SquarePen, Volume2, ZoomIn, ZoomOut, ChevronDown, Send, Activity } from 'lucide-react'
 import { ToolType } from './ToolsMenu'
 import ToolsMenu from './ToolsMenu'
 import { Input } from '@/components/ui/input'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator
+} from '@/components/ui/dropdown-menu'
 import { ui } from '@/styles/ui-classes'
 
 
@@ -17,7 +24,7 @@ interface ToolbarProps {
   onRestart:       () => void;
   onBpmChange:     (bpm: number) => void;
   onVolumeChange:  (volume: number) => void;
-  onAddTrack:      () => void;
+  onAddTrack:      (trackType?: 'audio' | 'bus') => void;
   usersCount:      number;
   activeTool:      ToolType;
   onChangeTool:    (tool: ToolType) => void;
@@ -49,9 +56,33 @@ const Toolbar: React.FC<ToolbarProps> = ({
 }) =>
   <div className={ ui.toolbar }>
     <div className={ ui.toolbarSection }>
-      <Button variant='secondary' className={ ui.button.secondary } onClick={ onAddTrack }>
-        Add Track
-      </Button>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant='secondary' className={ `${ui.button.secondary} flex items-center gap-2` }>
+            Add Track
+            <ChevronDown className='h-4 w-4' />
+          </Button>
+        </DropdownMenuTrigger>
+
+        <DropdownMenuContent>
+          <DropdownMenuItem onClick={ () => onAddTrack('audio') }>
+            <Mic className='mr-2 h-4 w-4' />
+            Audio Track
+          </DropdownMenuItem>
+
+          <DropdownMenuItem onClick={ () => onAddTrack('bus') }>
+            <Send className='mr-2 h-4 w-4' />
+            Bus Track
+          </DropdownMenuItem>
+
+          <DropdownMenuSeparator />
+
+          <DropdownMenuItem disabled>
+            <Activity className='mr-2 h-4 w-4' />
+            Master Track (Auto-created)
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
 
       <Button variant='secondary' className={ ui.button.secondary } onClick={ onOpenSettings }>
         Settings

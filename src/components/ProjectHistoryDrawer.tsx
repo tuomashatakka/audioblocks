@@ -50,6 +50,7 @@ const ActionIcons: Record<string, React.ReactNode> = {
 }
 
 // Helper function to get a human-readable action description
+// eslint-disable-next-line complexity
 const getActionDescription = (entry: ProjectHistoryEntry): string => {
   const params = entry.params || {}
 

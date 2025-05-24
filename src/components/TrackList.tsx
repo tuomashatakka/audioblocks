@@ -1,8 +1,9 @@
 import React, { forwardRef, useState } from 'react'
-import { Mic, Volume2, Lock, ChevronLeft, ChevronRight, Wrench } from 'lucide-react'
+import { Mic, Volume2, Lock, ChevronLeft, ChevronRight, Wrench, Activity, Send, ArrowRight } from 'lucide-react'
 import { Slider } from '@/components/ui/slider'
 import { Button } from '@/components/ui/button'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
+import { Badge } from '@/components/ui/badge'
 import { Record } from './Record'
 import { cn } from '@/lib/utils'
 
@@ -10,6 +11,7 @@ import { cn } from '@/lib/utils'
 export interface TrackInfo {
   id:                string;
   name:              string;
+  type:              'audio' | 'bus' | 'master'; // Track type for different functionality
   color:             string;
   volume:            number;
   muted:             boolean;
@@ -18,6 +20,9 @@ export interface TrackInfo {
   locked?:           boolean;
   lockedByUser?:     string;
   lockedByUserName?: string;
+  // Additional properties for bus/master tracks
+  receives?:         string[]; // For bus tracks - which tracks send to this bus
+  sends?:            { trackId: string; amount: number }[]; // For audio tracks - send to buses
 }
 
 interface TrackListProps {
@@ -78,18 +83,41 @@ const TrackList = forwardRef<HTMLDivElement, TrackListProps>(({
       {tracks.map((track, index) => {
         const isLockedByCurrentUser = track.locked && track.lockedByUser === localUserId
         const isLockedByOtherUser = track.locked && track.lockedByUser !== localUserId
+        const isBusTrack = track.type === 'bus'
+        const isMasterTrack = track.type === 'master'
+
+        // Don't render master track here - it's handled separately
+        if (isMasterTrack)
+          return null
 
         return <div
           key={ track.id }
-          className={ `track-item border-b border-border flex flex-col p-2 ${track.locked ? 'bg-muted/50' : ''}` }
+          className={ cn(
+            'track-item border-b border-border flex flex-col p-2',
+            track.locked && 'bg-muted/50',
+            isBusTrack && 'bg-orange-950/20 border-orange-500/20'
+          ) }
           style={{ height: `${trackHeight}px` }}>
           <div className='track-content'>
             <div className='flex items-center justify-between mb-1'>
-              <div
-                className='w-3 h-3 rounded-full mr-1 flex-shrink-0'
-                style={{ backgroundColor: track.color }} />
+              <div className='flex items-center space-x-1 flex-grow'>
+                {/* Track type indicator */}
+                {isBusTrack
+                  ? <Send className='h-3 w-3 text-orange-400 flex-shrink-0' />
+                  : <div
+                    className='w-3 h-3 rounded-full flex-shrink-0'
+                    style={{ backgroundColor: track.color }} />
+                }
 
-              <span className='text-xs font-medium truncate flex-grow'>{track.name}</span>
+                <span className='text-xs font-medium truncate flex-grow'>{track.name}</span>
+
+                {/* Track type badge */}
+                {isBusTrack &&
+                  <Badge variant='outline' className='text-xs bg-orange-500/20 border-orange-500/30 text-orange-400'>
+                    BUS
+                  </Badge>
+                }
+              </div>
 
               <div className='flex items-center space-x-1'>
                 {isLockedByOtherUser &&
@@ -130,7 +158,8 @@ const TrackList = forwardRef<HTMLDivElement, TrackListProps>(({
                   <Mic className='h-3 w-3' />
                 </ToggleGroupItem>
 
-                {onArmToggle &&
+                {/* Show record arm only for audio tracks */}
+                {onArmToggle && !isBusTrack &&
                       <ToggleGroupItem
                         value='arm'
                         size='sm'
@@ -141,6 +170,13 @@ const TrackList = forwardRef<HTMLDivElement, TrackListProps>(({
                         onClick={ () => onArmToggle(track.id) }>
                         <Record className='h-3 w-3' />
                       </ToggleGroupItem>
+                }
+
+                {/* Show sends indicator for bus tracks */}
+                {isBusTrack && track.receives && track.receives.length > 0 &&
+                      <div className='h-6 w-6 p-0 flex items-center justify-center' title={ `Receives from ${track.receives.length} track(s)` }>
+                        <ArrowRight className='h-3 w-3 text-orange-400' />
+                      </div>
                 }
 
                 {onLockToggle &&

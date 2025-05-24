@@ -5,6 +5,7 @@ import { ToolType } from '@/components/ToolsMenu'
 export interface Track {
   id:                string;
   name:              string;
+  type:              'audio' | 'bus' | 'master'; // Track type for different functionality
   color:             string;
   volume:            number;
   muted:             boolean;
@@ -13,6 +14,9 @@ export interface Track {
   locked?:           boolean;
   lockedByUser?:     string | null;
   lockedByUserName?: string | null;
+  // Additional properties for bus/master tracks
+  receives?:         string[]; // For bus tracks - which tracks send to this bus
+  sends?:            { trackId: string; amount: number }[]; // For audio tracks - send to buses
 }
 
 export interface Block {

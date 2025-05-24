@@ -190,6 +190,7 @@ const fetchProjectData = async (projectId: string) => {
     const formattedTracks = tracksData.map(track => ({
       id:               track.id,
       name:             track.name,
+      type:             track.track_type || 'audio', // Default to audio if not specified
       color:            track.color,
       volume:           track.volume,
       muted:            track.muted,
@@ -197,7 +198,9 @@ const fetchProjectData = async (projectId: string) => {
       armed:            track.armed ?? false,
       locked:           track.locked ?? false,
       lockedByUser:     track.locked_by_user_id || null,
-      lockedByUserName: track.locked_by_name || null
+      lockedByUserName: track.locked_by_name || null,
+      receives:         track.receives || [],
+      sends:            track.sends || []
     }))
 
     const formattedBlocks = blocksData.map(block => ({
@@ -576,11 +579,14 @@ export const ProjectProvider = ({ children }: ProjectProviderProps) => {
         .from('tracks')
         .insert({
           name:       trackData.name,
+          track_type: trackData.type || 'audio',
           color:      trackData.color,
           volume:     trackData.volume,
           muted:      trackData.muted,
           solo:       trackData.solo,
           armed:      trackData.armed,
+          receives:   trackData.receives || [],
+          sends:      trackData.sends || [],
           project_id: state.project.id
         })
         .select()

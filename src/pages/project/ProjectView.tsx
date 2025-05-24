@@ -6,6 +6,7 @@ import TrackList from '@/components/TrackList'
 import TrackBlock from '@/components/TrackBlock'
 import Timeline from '@/components/Timeline'
 import CompositionGridView from '@/components/CompositionGridView'
+import MasterTrack from '@/components/MasterTrack'
 import SettingsDialog from '@/components/SettingsDialog'
 import RemoteUser from '@/components/RemoteUser'
 import ClipEditPopup from '@/components/ClipEditPopup'
@@ -87,6 +88,7 @@ const fetchProjectData = async (projectId: string) => {
     const formattedTracks: TrackInfo[] = (tracksData || []).map(track => ({
       id:               track.id,
       name:             track.name,
+      type:             track.track_type || 'audio', // Default to audio if not specified
       color:            track.color,
       volume:           track.volume,
       muted:            track.muted,
@@ -94,7 +96,9 @@ const fetchProjectData = async (projectId: string) => {
       armed:            track.armed ?? false,
       locked:           track.locked ?? false,
       lockedByUser:     track.locked_by_user_id || null,
-      lockedByUserName: track.locked_by_name || null
+      lockedByUserName: track.locked_by_name || null,
+      receives:         track.receives || [],
+      sends:            track.sends || []
     }))
 
     // Transform blocks to match the application structure
@@ -214,7 +218,21 @@ const ProjectView: React.FC = () => {
   const totalBars = state.totalBars
   const activeTool = state.activeTool
   const settings = state.project.settings
-  const tracks = state.tracks || []
+  const allTracks = state.tracks || []
+
+  // Separate tracks by type
+  const tracks = useMemo(() => allTracks.filter(track => track.type !== 'master'), [ allTracks ])
+  const masterTrack = useMemo(() => allTracks.find(track => track.type === 'master') || {
+    id:     'master',
+    name:   'Master',
+    type:   'master' as const,
+    color:  '#22c55e',
+    volume: masterVolume,
+    muted:  false,
+    solo:   false,
+    armed:  false
+  }, [ allTracks, masterVolume ])
+
   const blocks = useMemo(() => state.blocks || [], [ state.blocks ])
   const markers = state.markers
   const historyVisible = state.historyVisible
@@ -594,24 +612,42 @@ const ProjectView: React.FC = () => {
     }
   }
 
-  const handleAddTrack = () => {
-    const colors = [ '#FF466A', '#FFB446', '#64C850', '#5096FF' ]
-    const newColor = colors[tracks.length % colors.length]
+  const handleAddTrack = (trackType: 'audio' | 'bus' = 'audio') => {
+    const colors = [ '#FF466A', '#FFB446', '#64C850', '#5096FF', '#9B59B6', '#E67E22' ]
+    const newColor = trackType === 'bus' ? '#fb7185' : colors[tracks.length % colors.length]
 
     const newTrackData = {
-      name:   `Track ${tracks.length + 1}`,
-      color:  newColor,
-      volume: 75,
-      muted:  false,
-      solo:   false,
-      armed:  false
+      name:     trackType === 'bus' ? `Bus ${tracks.filter(t => t.type === 'bus').length + 1}` : `Track ${tracks.length + 1}`,
+      type:     trackType,
+      color:    newColor,
+      volume:   75,
+      muted:    false,
+      solo:     false,
+      armed:    trackType === 'audio', // Only audio tracks can be armed
+      receives: trackType === 'bus' ? [] : undefined,
+      sends:    trackType === 'audio' ? [] : undefined
     }
 
     addTrack(newTrackData)
 
     toast({
       title:       'Track Added',
-      description: 'A new track has been added to your composition.',
+      description: `A new ${trackType} track has been added to your composition.`,
+    })
+  }
+
+  const handleMasterVolumeChange = (volume: number) => {
+    setMasterVolume(volume)
+  }
+
+  const handleMasterMuteToggle = () => {
+    // For now, we'll use a simple state management for master mute
+    // In a real implementation, this would be connected to the audio engine
+    const newMasterTrack = { ...masterTrack, muted: !masterTrack.muted }
+    // Update master track in context (we'd need to add this action)
+    toast({
+      title:       newMasterTrack.muted ? 'Master Muted' : 'Master Unmuted',
+      description: newMasterTrack.muted ? 'Master output is now muted' : 'Master output is now active'
     })
   }
 
@@ -716,8 +752,7 @@ const ProjectView: React.FC = () => {
     }, 60000 / bpm / 10)
 
     return () => clearInterval(interval)
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ isPlaying, bpm, beatsPerBar, totalBars, currentBeat ])
+  }, [ isPlaying, bpm, beatsPerBar, totalBars, currentBeat, setCurrentBeat ])
 
   const handleContainerClick = (e: React.MouseEvent) => {
     if (e.currentTarget === e.target)
@@ -976,6 +1011,21 @@ const ProjectView: React.FC = () => {
         placeholderBlock={ placeholderBlock }
         onAddBlock={ handleAddBlockFromContext }
         onUploadAudio={ handleUploadAudioFromContext } />
+
+      {/* Master Track at Bottom */}
+      <MasterTrack
+        masterTrack={ masterTrack }
+        allTracks={ allTracks }
+        allBlocks={ blocks }
+        pixelsPerBeat={ pixelsPerBeat }
+        trackHeight={ trackHeight }
+        totalBars={ totalBars }
+        beatsPerBar={ beatsPerBar }
+        currentBeat={ currentBeat }
+        isPlaying={ isPlaying }
+        onVolumeChange={ handleMasterVolumeChange }
+        onMuteToggle={ handleMasterMuteToggle }
+        localUserId={ state.localUserId } />
     </div>
 
     <ProjectHistoryDrawer

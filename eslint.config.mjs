@@ -49,9 +49,6 @@ const config = {
       node: {
         extensions: [ '.js', '.jsx', '.ts', '.tsx', '.mjs', '.cjs' ],
       },
-      typescript: {
-        alwaysTryTypes: true,
-      },
     },
     'react': {
       version: 'detect',

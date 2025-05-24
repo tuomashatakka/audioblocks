@@ -1,4 +1,3 @@
-/* eslint-disable react-hooks/exhaustive-deps */
 import React, { createContext, useContext, useReducer, useEffect, ReactNode, useCallback } from 'react'
 import { supabase } from '@/integrations/supabase/client'
 import WebSocketService from '@/utils/WebSocketService'
@@ -115,15 +114,17 @@ interface ProjectContextType {
 
 const ProjectContext = createContext<ProjectContextType | undefined>(undefined)
 
+ProjectContext.displayName = 'Project context'
+
 const webSocketService = WebSocketService.getInstance()
 
 interface ProjectProviderProps {
   children: ReactNode;
 }
 
+// eslint-disable-next-line complexity
 const fetchProjectData = async (projectId: string) => {
   try {
-    // Fetch project details
     const { data: projectData, error: projectError } = await supabase
       .from('projects')
       .select('*')

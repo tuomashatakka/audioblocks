@@ -5,11 +5,14 @@ import { TooltipProvider } from '@/components/ui/tooltip'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import { ProjectProvider } from '@/contexts/ProjectContext'
+import { UIContextProvider } from '@/contexts/ui-context'
 import WebSocketService from '@/utils/WebSocketService'
+
 import Index from './pages/Index'
 import NotFound from './pages/NotFound'
 import ProjectView from './pages/project/ProjectView'
 import ProjectListPage from './pages/ProjectListPage'
+
 
 // Create a new QueryClient instance
 const queryClient = new QueryClient()
@@ -36,21 +39,25 @@ const App: React.FC = () => {
 
   return <React.StrictMode>
     <QueryClientProvider client={ queryClient }>
-      <TooltipProvider>
-        <ProjectProvider>
-          <BrowserRouter>
-            <Routes>
-              <Route path='/' element={ <Index /> } />
-              <Route path='/projects' element={ <ProjectListPage /> } />
-              <Route path='/project/:projectId' element={ <ProjectView /> } />
-              <Route path='*' element={ <NotFound /> } />
-            </Routes>
-          </BrowserRouter>
+      <UIContextProvider>
+        <TooltipProvider>
+          <ProjectProvider>
 
-          <Toaster />
-          <Sonner />
-        </ProjectProvider>
-      </TooltipProvider>
+            <BrowserRouter>
+              <Routes>
+                <Route path='/' element={ <Index /> } />
+                <Route path='/projects' element={ <ProjectListPage /> } />
+                <Route path='/project/:projectId' element={ <ProjectView /> } />
+                <Route path='*' element={ <NotFound /> } />
+              </Routes>
+            </BrowserRouter>
+
+            <Toaster />
+            <Sonner />
+
+          </ProjectProvider>
+        </TooltipProvider>
+      </UIContextProvider>
     </QueryClientProvider>
   </React.StrictMode>
 }

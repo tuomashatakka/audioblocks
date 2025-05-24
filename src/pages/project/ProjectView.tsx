@@ -20,6 +20,7 @@ import { ui } from '@/styles/ui-classes'
 import ToolbarWithStatus from '@/components/ToolbarWithStatus'
 import { supabase } from '@/integrations/supabase/client'
 import { getAudioEngine } from '@/utils/AudioEngine'
+import { Block } from '@/contexts/projectReducer'
 
 // Fetch project data from Supabase
 const fetchProjectData = async (projectId: string) => {
@@ -127,6 +128,7 @@ const fetchProjectData = async (projectId: string) => {
   }
 }
 
+// eslint-disable-next-line max-statements
 const ProjectView: React.FC = () => {
   const { projectId } = useParams<{ projectId: string }>()
   const navigate = useNavigate()
